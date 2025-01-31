@@ -2,6 +2,7 @@
 
 CXX_FLAGS += -std=c++11 -O3 -Wall
 PAR_FLAG = -fopenmp
+INCLUDE = -I ~/boost_1_82_0 # Change this to your boost path
 
 ifneq (,$(findstring icpc,$(CXX)))
 	PAR_FLAG = -openmp
@@ -23,7 +24,12 @@ SUITE = $(KERNELS) converter
 all: $(SUITE)
 
 % : src/%.cc src/*.h
-	$(CXX) $(CXX_FLAGS) $< -o $@
+	mkdir -p bin
+	$(CXX) $(CXX_FLAGS) $(INCLUDE) $< -o bin/$@
+
+relax_% : src/relax/%.cc src/*.h src/relax/*.h
+	mkdir -p bin
+	$(CXX) $(CXX_FLAGS) $(INCLUDE) $< -o bin/$@
 
 # Testing
 include test/test.mk
@@ -31,7 +37,7 @@ include test/test.mk
 # Benchmark Automation
 include benchmark/bench.mk
 
-
 .PHONY: clean
 clean:
 	rm -f $(SUITE) test/out/*
+	rm -rf bin

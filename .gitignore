@@ -16,3 +16,6 @@ benchmark/graphs/*.wsg
 benchmark/graphs/raw/*
 
 .vscode/
+bin/*
+
+*.gr
