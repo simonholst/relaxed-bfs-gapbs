@@ -1,4 +1,5 @@
 #include <iostream>
+#include <omp.h>
 #include <vector>
 #include <queue>
 
@@ -11,6 +12,7 @@
 #include "../pvector.h"
 #include "bfs_helper.h"
 #include <boost/lockfree/queue.hpp>
+#include "FAAQ.h"
 
 #define MAX_DEPTH            0xFFFFFFFF00000000
 #define MOST_SIGNIFICANT_32  0xFFFFFFFF00000000
@@ -47,9 +49,11 @@ inline uint64_t incDepth(uint64_t node){
     return node + INC_DEPTH;
 } 
 
+__thread int thread_id;
+
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false)
 {
-    bool is_active = false; // TODO: add as private in omp pragma
+    bool is_active = false;
     uint64_t failures = 0;
     uint64_t cas_fails = 0;
 
@@ -57,18 +61,23 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     // - The parent's NodeID is the 32 least significant bits
     // - The depth is the 32 most significant bits
     pvector<uint64_t> node_to_parent_and_depth = InitNodeParentDepth(g);
-    boost::lockfree::queue<uint64_t> queue(false);
+    FAAArrayQueue<uint64_t> queue;
     uint64_t source = static_cast<uint64_t>(source_id);
     node_to_parent_and_depth[source] = source;
     printf("Source: %llu\n", source);
-    queue.push(source);
+    queue.enqueue(&source, omp_get_thread_num());
     uint64_t node;
     active_threads = 0;
 
     #pragma omp parallel private(is_active, node)
     {
         while (failures < MAX_FAILURES || active_threads != 0) {
-            while(queue.pop(node)) {
+            while(true) {
+                uint64_t* d = queue.dequeue(omp_get_thread_num());
+                if (d == nullptr) {
+                    break;
+                }
+                node = *d;
                 if (!is_active) {
                     __sync_fetch_and_add(&active_threads, 1);
                     is_active = true;
@@ -84,7 +93,8 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                     while (new_depth < neighbor_depth) {
                         uint64_t updated_node =  new_depth | parent_id;
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                            queue.push(new_depth | neighbor_id); 
+                            uint64_t* new_node = new uint64_t(new_depth | neighbor_id);
+                            queue.enqueue(new_node, omp_get_thread_num()); 
                             break;
                         }
                         __sync_fetch_and_add(&cas_fails, 1);
