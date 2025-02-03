@@ -16,6 +16,10 @@
 #define MOST_SIGNIFICANT_32  0xFFFFFFFF00000000
 #define LEAST_SIGNIFICANT_32 0x00000000FFFFFFFF
 #define INC_DEPTH            0x0000000100000000
+#define MAX_FAILURES         1000
+
+
+volatile uint64_t active_threads;
 
 pvector<uint64_t> InitNodeParentDepth(const Graph &g) {
     pvector<uint64_t> parent(g.num_nodes());
@@ -45,47 +49,59 @@ inline uint64_t incDepth(uint64_t node){
 
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false)
 {
+    bool is_active = false; // TODO: add as private in omp pragma
+    uint64_t failures = 0;
+    uint64_t cas_fails = 0;
+
     // Maps a NodeID n to a single uint64_t that contains both n's parent and the depth of n
     // - The parent's NodeID is the 32 least significant bits
     // - The depth is the 32 most significant bits
-    Timer t;
-    t.Start();
     pvector<uint64_t> node_to_parent_and_depth = InitNodeParentDepth(g);
     boost::lockfree::queue<uint64_t> queue(false);
     uint64_t source = static_cast<uint64_t>(source_id);
     node_to_parent_and_depth[source] = source;
+    printf("Source: %llu\n", source);
     queue.push(source);
     uint64_t node;
-    t.Stop();
-    if (logging_enabled)
-        PrintStep("init", t.Seconds());
-    t.Start();
-    uint64_t counter = 0;
-    while (queue.pop(node))
-    {
-        uint64_t parent_id = getParentId(node);
-        uint64_t depth = getDepth(node);
-        uint64_t new_depth = incDepth(depth);
+    active_threads = 0;
 
-        for (NodeID neighbor_id : g.out_neigh(node)) {
-            counter++;
-            uint64_t neighbor = node_to_parent_and_depth[neighbor_id];
-            uint64_t neighbor_depth = getDepth(neighbor);
-            while (new_depth < neighbor_depth) {
-                uint64_t updated_node =  new_depth | parent_id;
-                if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                    queue.push(new_depth | neighbor_id); 
-                    break;
+    #pragma omp parallel private(is_active, node)
+    {
+        while (failures < MAX_FAILURES || active_threads != 0) {
+            while(queue.pop(node)) {
+                if (!is_active) {
+                    __sync_fetch_and_add(&active_threads, 1);
+                    is_active = true;
+                    failures = 0;
                 }
-                neighbor = node_to_parent_and_depth[neighbor_id];
-                neighbor_depth = getDepth(neighbor);
+                uint64_t parent_id = getParentId(node);
+                uint64_t depth = getDepth(node);
+                uint64_t new_depth = incDepth(depth);
+
+                for (NodeID neighbor_id : g.out_neigh(node)) {
+                    uint64_t neighbor = node_to_parent_and_depth[neighbor_id];
+                    uint64_t neighbor_depth = getDepth(neighbor);
+                    while (new_depth < neighbor_depth) {
+                        uint64_t updated_node =  new_depth | parent_id;
+                        if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
+                            queue.push(new_depth | neighbor_id); 
+                            break;
+                        }
+                        __sync_fetch_and_add(&cas_fails, 1);
+                        neighbor = node_to_parent_and_depth[neighbor_id];
+                        neighbor_depth = getDepth(neighbor);
+                    }
+                }
             }
+            if (is_active)
+            {
+                __sync_fetch_and_sub(&active_threads, 1);
+                is_active = false;
+            }
+            failures += 1;
         }
     }
-    t.Stop();
-    if (logging_enabled)
-        PrintStep("loop", t.Seconds());
-    t.Start();
+
     pvector<NodeID> result(node_to_parent_and_depth.size());
     #pragma omp parallel for
     for (size_t i = 0; i < node_to_parent_and_depth.size(); i++) {
@@ -95,10 +111,8 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             result[i] = static_cast<NodeID>(node_to_parent_and_depth[i]);
         }
     }
-    t.Stop();
-    if (logging_enabled)
-        PrintStep("pare", t.Seconds());
-    printf("Counter: %llu\n", counter);
+    printf("CAS fails: %llu\n", cas_fails);
+    printf("Failures: %llu\n", failures);
     return result;
 }
 
