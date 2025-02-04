@@ -54,47 +54,51 @@ __thread int thread_id;
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false)
 {
     bool is_active = false;
+    int thread_id;
     uint64_t failures = 0;
     uint64_t cas_fails = 0;
+    uint64_t edges = 0;
 
     // Maps a NodeID n to a single uint64_t that contains both n's parent and the depth of n
     // - The parent's NodeID is the 32 least significant bits
     // - The depth is the 32 most significant bits
     pvector<uint64_t> node_to_parent_and_depth = InitNodeParentDepth(g);
-    FAAArrayQueue<uint64_t> queue;
+    FAAArrayQueue<NodeID> queue;
     uint64_t source = static_cast<uint64_t>(source_id);
-    node_to_parent_and_depth[source] = source;
+    node_to_parent_and_depth[source_id] = source;
     printf("Source: %llu\n", source);
-    queue.enqueue(&source, omp_get_thread_num());
-    uint64_t node;
+    queue.enqueue(&source_id, omp_get_thread_num());
+    NodeID node_id;
     active_threads = 0;
 
-    #pragma omp parallel private(is_active, node)
+    #pragma omp parallel private(is_active, node_id, thread_id)
     {
+        thread_id = omp_get_thread_num();
         while (failures < MAX_FAILURES || active_threads != 0) {
             while(true) {
-                uint64_t* d = queue.dequeue(omp_get_thread_num());
-                if (d == nullptr) {
+                NodeID* node_id_ptr = queue.dequeue(thread_id);
+                if (node_id_ptr == nullptr) {
                     break;
                 }
-                node = *d;
+                node_id = *node_id_ptr;
                 if (!is_active) {
                     __sync_fetch_and_add(&active_threads, 1);
                     is_active = true;
                     failures = 0;
                 }
+                uint64_t node = node_to_parent_and_depth[node_id];
                 uint64_t parent_id = getParentId(node);
                 uint64_t depth = getDepth(node);
                 uint64_t new_depth = incDepth(depth);
 
-                for (NodeID neighbor_id : g.out_neigh(node)) {
+                for (NodeID neighbor_id : g.out_neigh(node_id)) {
+                    __sync_fetch_and_add(&edges, 1);
                     uint64_t neighbor = node_to_parent_and_depth[neighbor_id];
                     uint64_t neighbor_depth = getDepth(neighbor);
                     while (new_depth < neighbor_depth) {
-                        uint64_t updated_node =  new_depth | parent_id;
+                        uint64_t updated_node =  new_depth | node_id;
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                            uint64_t* new_node = new uint64_t(new_depth | neighbor_id);
-                            queue.enqueue(new_node, omp_get_thread_num()); 
+                            queue.enqueue(&neighbor_id, thread_id); 
                             break;
                         }
                         __sync_fetch_and_add(&cas_fails, 1);
@@ -123,6 +127,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     }
     printf("CAS fails: %llu\n", cas_fails);
     printf("Failures: %llu\n", failures);
+    printf("Edges: %llu\n", edges);
     return result;
 }
 
