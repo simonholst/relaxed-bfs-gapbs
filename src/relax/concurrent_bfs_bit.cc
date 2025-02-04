@@ -1,6 +1,5 @@
 #include <iostream>
 #include <vector>
-#include <queue>
 
 #include "../benchmark.h"
 #include "../bitmap.h"
@@ -11,9 +10,11 @@
 #include "../pvector.h"
 #include "../util.h"
 #include "bfs_helper.h"
-#include <boost/lockfree/queue.hpp>
+//#include <boost/lockfree/queue.hpp>
 #include <chrono>
 #include <omp.h>
+#include "queues.h"
+
 
 #define MAX_DEPTH            0xFFFFFFFF00000000
 #define MOST_SIGNIFICANT_32  0xFFFFFFFF00000000
@@ -57,28 +58,32 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     uint64_t edges_looked_at = 0;
     uint64_t wrong_depth_count = 0;
     uint64_t queue_pops = 0;
-    printf("Source: %u\n", source_id);
+    PrintAligned("Source: %u", source_id);
     #endif
 
     bool is_active = false;
     uint64_t failures = 0;
+    int thread_id = omp_get_thread_num();
 
     // Maps a NodeID n to a single uint64_t that contains both n's parent and the depth of n
     // - The parent's NodeID is the 32 least significant bits
     // - The depth is the 32 most significant bits
     pvector<uint64_t> node_to_parent_and_depth = InitNodeParentDepth(g);
-    boost::lockfree::queue<NodeID> queue(false);
+    //boost::lockfree::queue<NodeID> queue(false);
+    QUEUE(NodeID);
     uint64_t source = static_cast<uint64_t>(source_id);
     node_to_parent_and_depth[source_id] = source;
-    queue.push(source);
+    ENQUEUE(source_id);
     NodeID node_id;
     active_threads = 0;
 
-    #pragma omp parallel private(is_active, node_id)
-    {
-        while (failures < MAX_FAILURES || active_threads != 0) {
-            while(queue.pop(node_id)) {
 
+
+    #pragma omp parallel private(is_active, node_id, thread_id)
+    {
+        thread_id = omp_get_thread_num();
+        while (failures < MAX_FAILURES || active_threads != 0) {
+            while(DEQUEUE(node_id)) {
                 if (!is_active) {
                     __sync_fetch_and_add(&active_threads, 1);
                     is_active = true;
@@ -105,7 +110,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                         #endif
                         uint64_t updated_node =  new_depth | node_id;
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                            queue.push(neighbor_id); 
+                            ENQUEUE(neighbor_id);
                             break;
                         }
                         #ifdef DEBUG
@@ -169,6 +174,8 @@ int main(int argc, char *argv[]) {
         return BFSVerifier(g, vsp.PickNext(), parent);
     };
 
+    PrintAligned("Threads", omp_get_max_threads());
+    PrintLabel("Queue", QUEUE_TYPE);
     BenchmarkKernel(cli, g, BFSBound, PrintBFSStats, VerifierBound);
     return 0;
 }
