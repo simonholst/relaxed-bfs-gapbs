@@ -11,6 +11,8 @@
 #include "../pvector.h"
 #include "bfs_helper.h"
 #include <boost/lockfree/queue.hpp>
+#include <chrono>
+#include <omp.h>
 
 #define MAX_DEPTH            0xFFFFFFFF00000000
 #define MOST_SIGNIFICANT_32  0xFFFFFFFF00000000
@@ -49,42 +51,64 @@ inline uint64_t incDepth(uint64_t node){
 
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false)
 {
-    bool is_active = false; // TODO: add as private in omp pragma
+    bool is_active = false;
     uint64_t failures = 0;
     uint64_t cas_fails = 0;
+    uint64_t edges_looked_at = 0;
+    uint64_t redundant_re_depth = 0;
+    uint64_t queue_pops = 0;
+    double total_time = 0;
+    double total_time_pop = 0;
 
     // Maps a NodeID n to a single uint64_t that contains both n's parent and the depth of n
     // - The parent's NodeID is the 32 least significant bits
     // - The depth is the 32 most significant bits
     pvector<uint64_t> node_to_parent_and_depth = InitNodeParentDepth(g);
-    boost::lockfree::queue<uint64_t> queue(false);
+    boost::lockfree::queue<NodeID> queue(false);
     uint64_t source = static_cast<uint64_t>(source_id);
-    node_to_parent_and_depth[source] = source;
+    node_to_parent_and_depth[source_id] = source;
     printf("Source: %llu\n", source);
     queue.push(source);
-    uint64_t node;
+    NodeID node_id;
     active_threads = 0;
+    std::chrono::duration<double> total_elapsed(0);
+    std::chrono::duration<double> total_elapsed_pop(0);
 
-    #pragma omp parallel private(is_active, node)
+    #pragma omp parallel private(is_active, node_id, total_elapsed, total_elapsed_pop)
     {
         while (failures < MAX_FAILURES || active_threads != 0) {
-            while(queue.pop(node)) {
+            while(true) {
+                auto start = std::chrono::high_resolution_clock::now();
+                bool suc = queue.pop(node_id);
+                auto end = std::chrono::high_resolution_clock::now();
+                total_elapsed_pop += end - start;
+                if (!suc) {
+                    break;
+                }
                 if (!is_active) {
                     __sync_fetch_and_add(&active_threads, 1);
                     is_active = true;
                     failures = 0;
                 }
-                uint64_t parent_id = getParentId(node);
+                __sync_fetch_and_add(&queue_pops, 1);
+                uint64_t node = node_to_parent_and_depth[node_id];
                 uint64_t depth = getDepth(node);
                 uint64_t new_depth = incDepth(depth);
 
-                for (NodeID neighbor_id : g.out_neigh(node)) {
+                for (NodeID neighbor_id : g.out_neigh(node_id)) {
+                    __sync_fetch_and_add(&edges_looked_at, 1);
                     uint64_t neighbor = node_to_parent_and_depth[neighbor_id];
                     uint64_t neighbor_depth = getDepth(neighbor);
                     while (new_depth < neighbor_depth) {
-                        uint64_t updated_node =  new_depth | parent_id;
+                        if (neighbor_depth != MAX_DEPTH) {
+                            __sync_fetch_and_add(&redundant_re_depth, 1);
+                        }
+                        uint64_t updated_node =  new_depth | node_id;
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                            queue.push(new_depth | neighbor_id); 
+                            auto start = std::chrono::high_resolution_clock::now();
+                            queue.push(neighbor_id); 
+                            auto end = std::chrono::high_resolution_clock::now();
+                            total_elapsed += end - start;
                             break;
                         }
                         __sync_fetch_and_add(&cas_fails, 1);
@@ -100,6 +124,11 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             }
             failures += 1;
         }
+        #pragma omp atomic
+        total_time += total_elapsed.count();
+
+        #pragma omp atomic
+        total_time_pop += total_elapsed_pop.count();
     }
 
     pvector<NodeID> result(node_to_parent_and_depth.size());
@@ -113,6 +142,11 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     }
     printf("CAS fails: %llu\n", cas_fails);
     printf("Failures: %llu\n", failures);
+    printf("Edges looked at: %llu\n", edges_looked_at);
+    printf("Redundant re-depths: %llu\n", redundant_re_depth);
+    printf("Queue pops: %llu\n", queue_pops);
+    printf("Total time: %f\n", total_time / omp_get_num_threads());
+    printf("Total time pop: %f\n", total_time_pop / omp_get_num_threads());
     return result;
 }
 
