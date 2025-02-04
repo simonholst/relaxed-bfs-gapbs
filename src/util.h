@@ -30,6 +30,10 @@ void PrintTime(const std::string &s, double seconds) {
   printf("%-21s%3.5lf\n", (s + ":").c_str(), seconds);
 }
 
+void PrintAligned(const std::string &s, uint value) {
+  printf("%-21s%u\n", (s + ":").c_str(), value);
+}
+
 void PrintStep(const std::string &s, int64_t count) {
   printf("%-14s%14" PRId64 "\n", (s + ":").c_str(), count);
 }

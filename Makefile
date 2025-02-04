@@ -29,7 +29,7 @@ all: $(SUITE)
 
 relax_% : src/relax/%.cc src/*.h src/relax/*.h
 	mkdir -p bin
-	$(CXX) $(CXX_FLAGS) $(INCLUDE) $< -o bin/$@
+	$(CXX) $(CXX_FLAGS) $(INCLUDE) $(debug) $< -o bin/$@
 
 # Testing
 include test/test.mk
