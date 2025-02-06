@@ -3,6 +3,7 @@
 CXX_FLAGS += -std=c++11 -O3 -Wall
 PAR_FLAG = -fopenmp
 INCLUDE = -I ~/boost_1_82_0 # Change this to your boost path
+RELAX_FLAGS =
 
 ifneq (,$(findstring icpc,$(CXX)))
 	PAR_FLAG = -openmp
@@ -17,6 +18,14 @@ ifneq ($(SERIAL), 1)
 	CXX_FLAGS += $(PAR_FLAG)
 endif
 
+ifeq ($(DEBUG), TRUE)
+	RELAX_FLAGS += -DDEBUG
+endif
+
+ifneq ($(QUEUE), )
+	RELAX_FLAGS += -D$(QUEUE)
+endif
+
 KERNELS = bc bfs cc cc_sv pr pr_spmv sssp tc
 SUITE = $(KERNELS) converter
 
@@ -25,11 +34,11 @@ all: $(SUITE)
 
 % : src/%.cc src/*.h
 	mkdir -p bin
-	$(CXX) $(CXX_FLAGS) $(INCLUDE) $< -o bin/$@
+	$(CXX) $(CXX_FLAGS) $< -o bin/$@
 
 relax_% : src/relax/%.cc src/*.h src/relax/*.h
 	mkdir -p bin
-	$(CXX) $(CXX_FLAGS) $(INCLUDE) $(debug) $< -o bin/$@
+	$(CXX) $(CXX_FLAGS) $(INCLUDE) $(RELAX_FLAGS) $< -o bin/$@
 
 # Testing
 include test/test.mk
