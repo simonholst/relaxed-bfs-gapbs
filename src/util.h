@@ -30,7 +30,7 @@ void PrintTime(const std::string &s, double seconds) {
   printf("%-21s%3.5lf\n", (s + ":").c_str(), seconds);
 }
 
-void PrintAligned(const std::string &s, uint value) {
+void PrintAligned(const std::string &s, unsigned int value) {
   printf("%-21s%u\n", (s + ":").c_str(), value);
 }
 
