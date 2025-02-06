@@ -12,6 +12,7 @@
 #include "../util.h"
 #include "bfs_helper.h"
 #include "node.h"
+#include "queues.h"
 #include <boost/lockfree/queue.hpp>
 #include <chrono>
 #include <omp.h>
@@ -41,18 +42,20 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 
     bool is_active = false;
     uint64_t failures = 0;
+    int thread_id = omp_get_thread_num();
 
     pvector<Node> node_to_parent_and_depth = InitNodeParentDepth(g);
-    boost::lockfree::queue<NodeID> queue(false);
+    QUEUE(NodeID);
     node_to_parent_and_depth[source_id] = {source_id, 0};
-    queue.push(source_id);
+    ENQUEUE(source_id);
     NodeID node_id;
     active_threads = 0;
 
-    #pragma omp parallel private(is_active, node_id)
+    #pragma omp parallel private(is_active, node_id, thread_id)
     {
+        thread_id = omp_get_thread_num();
         while (failures < MAX_FAILURES || active_threads != 0) {
-            while(queue.pop(node_id)) {
+            while(DEQUEUE(node_id)) {
 
                 if (!is_active) {
                     __sync_fetch_and_add(&active_threads, 1);
@@ -81,7 +84,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                         // uint64_t updated_node =  new_depth | node_id;
                         Node updated_node = {node_id, new_depth};
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                            queue.push(neighbor_id);
+                            ENQUEUE(neighbor_id);
                             break;
                         }
                         #ifdef DEBUG
