@@ -37,7 +37,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     uint64_t edges_looked_at = 0;
     uint64_t wrong_depth_count = 0;
     uint64_t queue_pops = 0;
-    printf("Source: %u\n", source_id);
+    PrintAligned("Source", source_id);
     #endif
 
     bool is_active = false;
@@ -148,6 +148,8 @@ int main(int argc, char *argv[]) {
         return BFSVerifier(g, vsp.PickNext(), parent);
     };
 
+    PrintAligned("Threads", omp_get_max_threads());
+    PrintLabel("Queue", QUEUE_TYPE);
     BenchmarkKernel(cli, g, BFSBound, PrintBFSStats, VerifierBound);
     return 0;
 }
