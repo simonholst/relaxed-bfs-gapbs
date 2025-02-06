@@ -101,6 +101,7 @@ void BenchmarkKernel(const CLApp &cli, const GraphT_ &g,
                      GraphFunc kernel, AnalysisFunc stats,
                      VerifierFunc verify) {
   g.PrintStats();
+  printf("\n");
   double total_seconds = 0;
   Timer trial_timer;
   for (int iter=0; iter < cli.num_trials(); iter++) {
@@ -118,6 +119,7 @@ void BenchmarkKernel(const CLApp &cli, const GraphT_ &g,
       trial_timer.Stop();
       PrintTime("Verification Time", trial_timer.Seconds());
     }
+    printf("\n");
   }
   PrintTime("Average Time", total_seconds / cli.num_trials());
 }
