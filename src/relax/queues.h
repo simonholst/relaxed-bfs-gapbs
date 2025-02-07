@@ -19,6 +19,7 @@
             return false;
         }
         val = *elem;
+        delete elem;
         return true;
     }
 
