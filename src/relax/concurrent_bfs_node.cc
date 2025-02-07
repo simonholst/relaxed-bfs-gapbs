@@ -10,6 +10,7 @@
 #include "../platform_atomics.h"
 #include "../pvector.h"
 #include "../util.h"
+#include "../json.h"
 #include "bfs_helper.h"
 #include "node.h"
 #include "queues.h"
@@ -17,11 +18,18 @@
 #include <chrono>
 #include <omp.h>
 
+using json = nlohmann::json;
+
 #define MAX_FAILURES         1000
 
 volatile uint64_t active_threads;
+std::vector<uint64_t> source_node_vec;
+std::vector<uint64_t> cas_fails_vec;
+std::vector<uint64_t> edges_looked_at_vec;
+std::vector<uint64_t> wrong_depth_count_vec;
+std::vector<uint64_t> queue_pops_vec;
 
-pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false)
+pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false)
 {
     #ifdef DEBUG
     uint64_t cas_fails = 0;
@@ -29,6 +37,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     uint64_t wrong_depth_count = 0;
     uint64_t queue_pops = 0;
     PrintAligned("Source", source_id);
+    source_node_vec.push_back(source_id);
     #endif
 
     bool is_active = false;
@@ -107,12 +116,16 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     PrintAligned("Wrong depth count", wrong_depth_count);
     PrintAligned("Queue pops", queue_pops);
     printf("-----\n");
+    cas_fails_vec.push_back(cas_fails);
+    edges_looked_at_vec.push_back(edges_looked_at);
+    wrong_depth_count_vec.push_back(wrong_depth_count);
+    queue_pops_vec.push_back(queue_pops);
     #endif
     return result;
 }
 
 int main(int argc, char *argv[]) {
-    CLApp cli(argc, argv, "concurrent breadth-first search");
+    CLBFSApp cli(argc, argv, "Concurrent BFS");
 
     if (!cli.ParseArgs()) {
         printf("Exiting");
@@ -137,6 +150,23 @@ int main(int argc, char *argv[]) {
 
     PrintAligned("Threads", omp_get_max_threads());
     PrintLabel("Queue", QUEUE_TYPE);
-    BenchmarkKernel(cli, g, BFSBound, PrintBFSStats, VerifierBound);
+    auto structured_output = BenchmarkKernelWithStructuredOutput(cli, g, BFSBound, PrintBFSStats, VerifierBound);
+
+    if (cli.structured_output()) {
+        auto runs = structured_output["run_details"];
+        structured_output["queue"] = QUEUE_TYPE;
+        for (size_t i = 0; i < source_node_vec.size(); i++) {
+            auto run = runs[i];
+            run["cas_fails"] = cas_fails_vec[i];
+            run["edges_looked_at"] = edges_looked_at_vec[i];
+            run["wrong_depth_count"] = wrong_depth_count_vec[i];
+            run["queue_pops"] = queue_pops_vec[i];
+            run["source"] = source_node_vec[i];
+            runs[i] = run;
+        }
+        structured_output["run_details"] = runs;
+        WriteJsonToFile(cli.output_name(), structured_output);
+    }
+
     return 0;
 }

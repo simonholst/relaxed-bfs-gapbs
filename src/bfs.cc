@@ -248,7 +248,7 @@ bool BFSVerifier(const Graph &g, NodeID source,
 
 
 int main(int argc, char* argv[]) {
-  CLApp cli(argc, argv, "breadth-first search");
+  CLBFSApp cli(argc, argv, "DO BFS");
   if (!cli.ParseArgs())
     return -1;
   Builder b(cli);
@@ -261,6 +261,7 @@ int main(int argc, char* argv[]) {
   auto VerifierBound = [&vsp] (const Graph &g, const pvector<NodeID> &parent) {
     return BFSVerifier(g, vsp.PickNext(), parent);
   };
-  BenchmarkKernel(cli, g, BFSBound, PrintBFSStats, VerifierBound);
+  auto structured_output = BenchmarkKernelWithStructuredOutput(cli, g, BFSBound, PrintBFSStats, VerifierBound);
+  WriteJsonToFile(cli.output_name(), structured_output);
   return 0;
 }

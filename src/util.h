@@ -8,6 +8,7 @@
 #include <cinttypes>
 #include <string>
 
+#include "json.h"
 #include "timer.h"
 
 
@@ -82,5 +83,11 @@ class Range{
   RangeIter<T_> begin() const { return RangeIter<T_>(from_); }
   RangeIter<T_> end() const { return RangeIter<T_>(to_); }
 };
+
+void WriteJsonToFile(const std::string &filename, const nlohmann::json &structured_output) {
+  std::ofstream output_file(filename + ".json");
+  output_file << structured_output.dump(4);
+  output_file.close();
+}
 
 #endif  // UTIL_H_
