@@ -26,7 +26,7 @@ pvector<Node> InitNodeParentDepth(const Graph &g) {
     pvector<Node> parent(g.num_nodes());
     #pragma omp parallel for
     for (int64_t n = 0; n < g.num_nodes(); n++)
-        parent[n].depth = 0xFFFFFFFF;
+        parent[n].depth = MAX_DEPTH;
     return parent;
 } 
 
@@ -58,12 +58,12 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             while(DEQUEUE(node_id)) {
 
                 if (!is_active) {
-                    __sync_fetch_and_add(&active_threads, 1);
+                    fetch_and_add(active_threads, 1);
                     is_active = true;
                     failures = 0;
                 }
                 #ifdef DEBUG
-                __sync_fetch_and_add(&queue_pops, 1);
+                fetch_and_add(queue_pops, 1);
                 #endif
                 Node node = node_to_parent_and_depth[node_id];
                 uint32_t depth = node.depth;
@@ -71,14 +71,14 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 
                 for (NodeID neighbor_id : g.out_neigh(node_id)) {
                     #ifdef DEBUG
-                    __sync_fetch_and_add(&edges_looked_at, 1);
+                    fetch_and_add(edges_looked_at, 1);
                     #endif
                     Node neighbor = node_to_parent_and_depth[neighbor_id];
                     uint32_t neighbor_depth = neighbor.depth;
                     while (new_depth < neighbor_depth) {
                         #ifdef DEBUG
                         if (neighbor_depth != MAX_DEPTH) {
-                            __sync_fetch_and_add(&wrong_depth_count, 1);
+                            fetch_and_add(wrong_depth_count, 1);
                         }
                         #endif
                         // uint64_t updated_node =  new_depth | node_id;
@@ -88,7 +88,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                             break;
                         }
                         #ifdef DEBUG
-                        __sync_fetch_and_add(&cas_fails, 1);
+                        fetch_and_add(cas_fails, 1);
                         #endif
                         neighbor = node_to_parent_and_depth[neighbor_id];
                         neighbor_depth = neighbor.depth;
@@ -97,7 +97,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             }
             if (is_active)
             {
-                __sync_fetch_and_sub(&active_threads, 1);
+                fetch_and_sub(active_threads, 1);
                 is_active = false;
             }
             failures += 1;
