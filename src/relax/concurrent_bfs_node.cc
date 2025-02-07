@@ -17,18 +17,9 @@
 #include <chrono>
 #include <omp.h>
 
-#define MAX_DEPTH            0xFFFFFFFF
 #define MAX_FAILURES         1000
 
 volatile uint64_t active_threads;
-
-pvector<Node> InitNodeParentDepth(const Graph &g) {
-    pvector<Node> parent(g.num_nodes());
-    #pragma omp parallel for
-    for (int64_t n = 0; n < g.num_nodes(); n++)
-        parent[n].depth = MAX_DEPTH;
-    return parent;
-} 
 
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false)
 {
@@ -44,7 +35,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     uint64_t failures = 0;
     int thread_id = omp_get_thread_num();
 
-    pvector<Node> node_to_parent_and_depth = InitNodeParentDepth(g);
+    pvector<Node> node_to_parent_and_depth = pvector<Node>(g.num_nodes());
     QUEUE(NodeID);
     node_to_parent_and_depth[source_id] = {source_id, 0};
     ENQUEUE(source_id);
@@ -107,11 +98,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     pvector<NodeID> result(node_to_parent_and_depth.size());
     #pragma omp parallel for
     for (size_t i = 0; i < node_to_parent_and_depth.size(); i++) {
-        if (node_to_parent_and_depth[i].depth == MAX_DEPTH) {
-            result[i] = -1;
-        } else {
-            result[i] = static_cast<NodeID>(node_to_parent_and_depth[i].parent);
-        }
+        result[i] = node_to_parent_and_depth[i].parent;
     }
     #ifdef DEBUG
     printf("-----\n");

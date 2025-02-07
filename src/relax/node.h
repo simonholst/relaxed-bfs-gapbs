@@ -1,9 +1,14 @@
 #include <cstdint>
 
+#define MAX_DEPTH 0xFFFFFFFF
 struct Node
 {
     NodeID parent;
     uint32_t depth;
+
+    Node() : parent(-1), depth(MAX_DEPTH) {}
+
+    Node(NodeID parent, uint32_t depth) : parent(parent), depth(depth) {}
 };
 
 // Function to perform CAS on a 64-bit struct
