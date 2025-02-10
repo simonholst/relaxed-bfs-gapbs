@@ -148,23 +148,26 @@ json BenchmarkKernelWithStructuredOutput(const CLBFSApp &cli, const GraphT_ &g,
   double total_seconds = 0;
   Timer trial_timer;
   for (int iter=0; iter < cli.num_trials(); iter++) {
+    json run_detail;
     trial_timer.Start();
     auto result = kernel(g);
     trial_timer.Stop();
     PrintTime("Trial Time", trial_timer.Seconds());
     times.push_back(trial_timer.Seconds());
-    run_details.push_back({{"time", trial_timer.Seconds()}});
+    run_detail["time"] = trial_timer.Seconds();
     total_seconds += trial_timer.Seconds();
     if (cli.do_analysis() && (iter == (cli.num_trials()-1)))
       stats(g, result);
     if (cli.do_verify()) {
       trial_timer.Start();
+      bool pass = verify(std::ref(g), std::ref(result));
       PrintLabel("Verification",
-                 verify(std::ref(g), std::ref(result)) ? "PASS" : "FAIL");
+                 pass ? "PASS" : "FAIL");
       trial_timer.Stop();
-
+      run_detail["passed"] = pass;
       PrintTime("Verification Time", trial_timer.Seconds());
     }
+    run_details.push_back(run_detail);
   }
   structured_output["times"] = times;
   structured_output["run_details"] = run_details;
