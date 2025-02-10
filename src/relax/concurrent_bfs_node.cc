@@ -27,7 +27,6 @@ std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> cas_fails_vec;
 std::vector<uint64_t> edges_looked_at_vec;
 std::vector<uint64_t> wrong_depth_count_vec;
-std::vector<uint64_t> queue_pops_vec;
 
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false)
 {
@@ -35,8 +34,10 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     uint64_t cas_fails = 0;
     uint64_t edges_looked_at = 0;
     uint64_t wrong_depth_count = 0;
-    uint64_t queue_pops = 0;
-    PrintAligned("Source", source_id);
+    if (logging_enabled) {
+        PrintAligned("Source", source_id);
+    }
+
     source_node_vec.push_back(source_id);
     #endif
 
@@ -62,9 +63,6 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                     is_active = true;
                     failures = 0;
                 }
-                #ifdef DEBUG
-                fetch_and_add(queue_pops, 1);
-                #endif
                 Node node = node_to_parent_and_depth[node_id];
                 uint32_t depth = node.depth;
                 uint32_t new_depth = depth + 1;
@@ -110,16 +108,14 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         result[i] = node_to_parent_and_depth[i].parent;
     }
     #ifdef DEBUG
-    printf("-----\n");
-    PrintAligned("CAS fails", cas_fails);
-    PrintAligned("Edges looked at", edges_looked_at);
-    PrintAligned("Wrong depth count", wrong_depth_count);
-    PrintAligned("Queue pops", queue_pops);
-    printf("-----\n");
+    if (logging_enabled) {
+        PrintAligned("CAS fails", cas_fails);
+        PrintAligned("Edges looked at", edges_looked_at);
+        PrintAligned("Wrong depth count", wrong_depth_count);
+    }
     cas_fails_vec.push_back(cas_fails);
     edges_looked_at_vec.push_back(edges_looked_at);
     wrong_depth_count_vec.push_back(wrong_depth_count);
-    queue_pops_vec.push_back(queue_pops);
     #endif
     return result;
 }
@@ -160,7 +156,6 @@ int main(int argc, char *argv[]) {
             run["cas_fails"] = cas_fails_vec[i];
             run["edges_looked_at"] = edges_looked_at_vec[i];
             run["wrong_depth_count"] = wrong_depth_count_vec[i];
-            run["queue_pops"] = queue_pops_vec[i];
             run["source"] = source_node_vec[i];
             runs[i] = run;
         }
