@@ -2,7 +2,7 @@
 
 CXX_FLAGS += -std=c++11 -O3 -Wall
 PAR_FLAG = -fopenmp
-INCLUDE = -I ~/boost_1_82_0 # Change this to your boost path
+INCLUDE = -I include/boost_1_82_0
 RELAX_FLAGS =
 
 ifneq (,$(findstring icpc,$(CXX)))
