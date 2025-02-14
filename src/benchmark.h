@@ -137,10 +137,11 @@ json BenchmarkKernelWithStructuredOutput(const CLBFSApp &cli, const GraphT_ &g,
     BenchmarkKernel(cli, g, kernel, stats, verify);
     return json();
   }
+  g.PrintStats();
   json structured_output;
   structured_output["nodes"] = g.num_nodes();
   structured_output["edges"] = g.num_edges_directed();
-  structured_output["degree"] = g.num_edges_directed() / g.num_nodes();
+  structured_output["degree"] = g.num_edges() / g.num_nodes();
   structured_output["threads"] = omp_get_max_threads();
   structured_output["name"] = cli.name();
   json times = json::array();
