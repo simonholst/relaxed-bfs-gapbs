@@ -317,8 +317,24 @@ public:
         return do_push<true>(t);
     }
 
+    size_t enqueue_count() const
+    {
+        return tail_.load(memory_order_acquire).get_tag();
+    }
+
+    size_t dequeue_count() const
+    {
+        return head_.load(memory_order_acquire).get_tag();
+    }
+
+    size_t enqueue_version() const
+    {
+        return tail_.load(memory_order_acquire).get_tag();
+    }
+
 
 private:
+
 #ifndef BOOST_DOXYGEN_INVOKED
     template <bool Bounded>
     bool do_push(T const & t)

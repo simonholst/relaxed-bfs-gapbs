@@ -1,6 +1,6 @@
 # See LICENSE.txt for license details.
 
-CXX_FLAGS += -std=c++11 -O3 -Wall
+CXX_FLAGS += -std=c++14 -O3 -Wall
 PAR_FLAG = -fopenmp
 INCLUDE = -I include/boost_1_82_0
 RELAX_FLAGS =
