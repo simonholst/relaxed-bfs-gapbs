@@ -317,19 +317,19 @@ public:
         return do_push<true>(t);
     }
 
-    size_t enqueue_count() const
+    uint16_t enqueue_count() const
     {
-        return tail_.load(memory_order_acquire).get_tag();
+        return tail_.load(memory_order_relaxed).get_tag();
     }
 
-    size_t dequeue_count() const
+    uint16_t dequeue_count() const
     {
-        return head_.load(memory_order_acquire).get_tag();
+        return head_.load(memory_order_relaxed).get_tag();
     }
 
-    size_t enqueue_version() const
+    uint16_t enqueue_version() const
     {
-        return tail_.load(memory_order_acquire).get_tag();
+        return tail_.load(memory_order_relaxed).get_tag();
     }
 
 

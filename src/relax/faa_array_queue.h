@@ -207,12 +207,13 @@ private:
         std::atomic<T*>    items[BUFFER_SIZE];
         std::atomic<int>   enqidx;
         std::atomic<Node*> next;
+        int                node_idx;
 
         // Start with the first entry pre-filled and enqidx at 1
-        Node(T* item) : deqidx{0}, enqidx{1}, next{nullptr} {
+        Node(T* item, int node_idx) : deqidx{0}, enqidx{1}, next{nullptr}, node_idx{node_idx} {
             items[0].store(item, std::memory_order_relaxed);
             for (long i = 1; i < BUFFER_SIZE; i++) {
-                items[i].store(nullptr, std::memory_order_relaxed);
+            items[i].store(nullptr, std::memory_order_relaxed);
             }
         }
 
@@ -246,7 +247,7 @@ private:
 
 public:
     FAAArrayQueue(int maxThreads=MAX_THREADS) : maxThreads{maxThreads} {
-        Node* sentinelNode = new Node(nullptr);
+        Node* sentinelNode = new Node(nullptr, 0);
         sentinelNode->enqidx.store(0, std::memory_order_relaxed);
         head.store(sentinelNode, std::memory_order_relaxed);
         tail.store(sentinelNode, std::memory_order_relaxed);
@@ -272,7 +273,7 @@ public:
                 if (ltail != tail.load()) continue;
                 Node* lnext = ltail->next.load();
                 if (lnext == nullptr) {
-                    Node* newNode = new Node(item);
+                    Node* newNode = new Node(item, ltail->node_idx + 1);
                     if (ltail->casNext(nullptr, newNode)) {
                         casTail(ltail, newNode);
                         hp.clear(tid);
@@ -311,6 +312,39 @@ public:
         }
         hp.clear(tid);
         return nullptr;
+    }
+
+    int enqueue_count(const int tid) {
+        Node* ltail = hp.protect(kHpTail, tail, tid);
+        int idx = ltail->enqidx.load();
+        if (idx > BUFFER_SIZE - 1) {
+            idx = BUFFER_SIZE;
+        }
+        auto res = idx + BUFFER_SIZE * ltail->node_idx;
+        hp.clear(tid);
+        return res;
+    }
+
+    int dequeue_count(const int tid) {
+        Node* lhead = hp.protect(kHpHead, head, tid);
+        int idx = lhead->deqidx.load();
+        if (idx > BUFFER_SIZE - 1) {
+            idx = BUFFER_SIZE;
+        }
+        auto res = idx + BUFFER_SIZE * lhead->node_idx;
+        hp.clear(tid);
+        return res;
+    }
+
+    int enqueue_version(const int tid) {
+        Node* ltail = hp.protect(kHpTail, tail, tid);
+        int idx = ltail->enqidx.load();
+        if (idx > BUFFER_SIZE - 1) {
+            idx = BUFFER_SIZE;
+        }
+        auto res = idx + BUFFER_SIZE * ltail->node_idx;
+        hp.clear(tid);
+        return res;
     }
 };
 
