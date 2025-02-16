@@ -24,20 +24,19 @@ using json = nlohmann::json;
 
 volatile uint64_t active_threads;
 std::vector<uint64_t> source_node_vec;
-std::vector<uint64_t> cas_fails_vec;
-std::vector<uint64_t> edges_looked_at_vec;
-std::vector<uint64_t> wrong_depth_count_vec;
+std::vector<uint64_t> nodes_visited_vec;
+std::vector<uint64_t> nodes_revisited_vec;
 
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false)
 {
     #ifdef DEBUG
-    uint64_t cas_fails = 0;
-    uint64_t edges_looked_at = 0;
-    uint64_t wrong_depth_count = 0;
+    uint64_t nodes_revisited_local = 0;
+    uint64_t nodes_revisited_total = 0;
+    uint64_t nodes_visited_local = 0;
+    uint64_t nodes_visited_total = 0;
     if (logging_enabled) {
         PrintAligned("Source", source_id);
     }
-
     source_node_vec.push_back(source_id);
     #endif
 
@@ -52,12 +51,23 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     NodeID node_id;
     active_threads = 0;
 
+    #ifdef DEBUG
+    #pragma omp parallel private(is_active, node_id, thread_id, nodes_revisited_local, nodes_visited_local)
+    #endif
+    #ifndef DEBUG
     #pragma omp parallel private(is_active, node_id, thread_id)
+    #endif
     {
         thread_id = omp_get_thread_num();
+        #ifdef DEBUG
+        nodes_revisited_local = 0;
+        nodes_visited_local = 0;
+        #endif
         while (failures < MAX_FAILURES || active_threads != 0) {
             while(DEQUEUE(node_id)) {
-
+                #ifdef DEBUG
+                    nodes_visited_local += 1;
+                #endif
                 if (!is_active) {
                     fetch_and_add(active_threads, 1);
                     is_active = true;
@@ -68,26 +78,19 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                 uint32_t new_depth = depth + 1;
 
                 for (NodeID neighbor_id : g.out_neigh(node_id)) {
-                    #ifdef DEBUG
-                    fetch_and_add(edges_looked_at, 1);
-                    #endif
                     Node neighbor = node_to_parent_and_depth[neighbor_id];
                     uint32_t neighbor_depth = neighbor.depth;
                     while (new_depth < neighbor_depth) {
                         #ifdef DEBUG
                         if (neighbor_depth != MAX_DEPTH) {
-                            fetch_and_add(wrong_depth_count, 1);
+                            nodes_revisited_local += 1;
                         }
                         #endif
-                        // uint64_t updated_node =  new_depth | node_id;
                         Node updated_node = {node_id, new_depth};
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
                             ENQUEUE(neighbor_id);
                             break;
                         }
-                        #ifdef DEBUG
-                        fetch_and_add(cas_fails, 1);
-                        #endif
                         neighbor = node_to_parent_and_depth[neighbor_id];
                         neighbor_depth = neighbor.depth;
                     }
@@ -100,6 +103,12 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             }
             failures += 1;
         }
+        #ifdef DEBUG
+        #pragma omp atomic
+        nodes_revisited_total += nodes_revisited_local;
+        #pragma omp atomic
+        nodes_visited_total += nodes_visited_local;
+        #endif
     }
 
     pvector<NodeID> result(node_to_parent_and_depth.size());
@@ -109,13 +118,11 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     }
     #ifdef DEBUG
     if (logging_enabled) {
-        PrintAligned("CAS fails", cas_fails);
-        PrintAligned("Edges looked at", edges_looked_at);
-        PrintAligned("Wrong depth count", wrong_depth_count);
+        PrintAligned("Nodes visited", nodes_visited_total);
+        PrintAligned("Nodes revisited", nodes_revisited_total);
     }
-    cas_fails_vec.push_back(cas_fails);
-    edges_looked_at_vec.push_back(edges_looked_at);
-    wrong_depth_count_vec.push_back(wrong_depth_count);
+    nodes_visited_vec.push_back(nodes_visited_total);
+    nodes_revisited_vec.push_back(nodes_revisited_total);
     #endif
     return result;
 }
@@ -153,9 +160,8 @@ int main(int argc, char *argv[]) {
         structured_output["queue"] = QUEUE_TYPE;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
-            run["cas_fails"] = cas_fails_vec[i];
-            run["edges_looked_at"] = edges_looked_at_vec[i];
-            run["wrong_depth_count"] = wrong_depth_count_vec[i];
+            run["nodes_visited"] = nodes_visited_vec[i];
+            run["nodes_revisited"] = nodes_revisited_vec[i];
             run["source"] = source_node_vec[i];
             runs[i] = run;
         }
