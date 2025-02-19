@@ -29,6 +29,22 @@
     #define QUEUE_TYPE "FAA Array Queue"
 #endif
 
+#ifdef FAA_INT
+    #include "faa_array_queue_int.h"
+
+    using namespace FAAAQInt;
+
+    inline bool dequeue(FAAArrayQueue<int32_t>& queue, int32_t& val, int tid) {
+        val = queue.dequeue(tid);
+        return val != -1;
+    }
+
+    #define ENQUEUE(val) queue.enqueue(val, thread_id)
+    #define DEQUEUE(val) dequeue(queue, val, thread_id)
+    #define QUEUE(type) FAAArrayQueue<int32_t> queue
+    #define QUEUE_TYPE "FAA Array Queue Int"
+#endif
+
 #ifdef DCBO_MS
     #include "subqueues.h"
 
@@ -58,6 +74,22 @@
     #define ENQUEUE(val) queue.enqueue(val, thread_id)
     #define DEQUEUE(val) queue.dequeue(val, thread_id)
     #define QUEUE(type) DCBOQueue<FAAArrayQueue<type>, type, D, NUM_SUBQUEUES> queue
+    #define QUEUE_TYPE "d-CBO FAA"
+#endif
+
+#ifdef DCBO_FAA_INT
+    #include "subqueues.h"
+
+    #ifndef D
+        #define D 2
+    #endif
+    #ifndef NUM_SUBQUEUES
+        #define NUM_SUBQUEUES 64
+    #endif
+
+    #define ENQUEUE(val) queue.enqueue(val, thread_id)
+    #define DEQUEUE(val) queue.dequeue(val, thread_id)
+    #define QUEUE(type) DCBOQueue<FAAArrayQueueInt, int32_t, D, NUM_SUBQUEUES> queue
     #define QUEUE_TYPE "d-CBO FAA"
 #endif
 

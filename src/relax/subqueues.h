@@ -13,6 +13,7 @@
 #include <omp.h>
 #include "boost/lockfree/queue.hpp"
 #include "faa_array_queue.h"
+#include "faa_array_queue_int.h"
 
 using namespace std;
 
@@ -180,6 +181,83 @@ public:
             for (int i = 0; i < SubQueueCount; ++i) {
                 versions[i] = _sub_queues[i]->enqueue_version(thread_id);
                 if (this->faaaq_dequeue(i, item, thread_id)) {
+                    return true;
+                }
+            }
+            bool all_equal = true;
+            for (int i = 0; i < SubQueueCount; ++i) {
+                if (_sub_queues[i]->enqueue_version(thread_id) != versions[i]) {
+                    all_equal = false;
+                    break;
+                }
+            }
+            if (all_equal) {
+                return false;
+            }
+        }
+    }
+};
+
+typedef FAAAQInt::FAAArrayQueue<int32_t> FAAArrayQueueInt;
+template <typename ElementType, int SampleSize, int SubQueueCount>
+class DCBOQueue<FAAAQInt::FAAArrayQueue<ElementType>, ElementType, SampleSize, SubQueueCount> : public DCBOQueueBase<FAAAQInt::FAAArrayQueue<ElementType>, ElementType, SampleSize, SubQueueCount> {
+private:
+    typedef FAAAQInt::FAAArrayQueue<ElementType> QueueType;
+    typedef array<unique_ptr<QueueType>, SubQueueCount> SubQueues;
+    SubQueues _sub_queues;
+
+    inline size_t faaaq_optimal_enqueue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues, const int thread_id) {
+        auto min_index = this->_distribution(this->_generator);
+        auto min_enqueue_count = sub_queues[min_index]->enqueue_count(thread_id);
+        for (size_t i = 1; i < SampleSize; ++i) {
+            auto random_index = this->_distribution(this->_generator);
+            auto enqueue_count = sub_queues[random_index]->enqueue_count(thread_id);
+            if (enqueue_count < min_enqueue_count) {
+                min_enqueue_count = enqueue_count;
+                min_index = random_index;
+            }
+        }
+        return min_index;
+    }
+
+    inline size_t faaaq_optimal_dequeue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues, const int thread_id) {
+        auto min_index = this->_distribution(this->_generator);
+        auto min_dequeue_count = sub_queues[min_index]->dequeue_count(thread_id);
+        for (size_t i = 1; i < SampleSize; ++i) {
+            auto random_index = this->_distribution(this->_generator);
+            auto dequeue_count = sub_queues[random_index]->dequeue_count(thread_id);
+            if (dequeue_count < min_dequeue_count) {
+                min_dequeue_count = dequeue_count;
+                min_index = random_index;
+            }
+        }
+        return min_index;
+    }
+
+public:
+    DCBOQueue() {
+        for (int i = 0; i < SubQueueCount; ++i) {
+            _sub_queues[i] = make_unique<FAAAQInt::FAAArrayQueue<int32_t>>();
+        }
+    }
+
+    void enqueue(const int32_t value, int thread_id) {
+        auto min_index = this->faaaq_optimal_enqueue_index(_sub_queues, thread_id);
+        _sub_queues[min_index]->enqueue(value, thread_id);
+    }
+
+    bool dequeue(int32_t& item, int thread_id) {
+        auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
+        item = _sub_queues[min_index]->dequeue(thread_id);
+        return item != -1;
+    }
+
+    bool double_collect(int32_t& item, int thread_id) {
+        auto versions = array<uint16_t, SubQueueCount>();
+        while (true) {
+            for (int i = 0; i < SubQueueCount; ++i) {
+                versions[i] = _sub_queues[i]->enqueue_version(thread_id);
+                if (this->dequeue(item, thread_id)) {
                     return true;
                 }
             }
