@@ -221,12 +221,10 @@ class CSRGraph {
   }
 
   void PrintStats() const {
-    std::cout << "Graph has " << num_nodes_ << " nodes and "
-              << num_edges_ << " ";
-    if (!directed_)
-      std::cout << "un";
-    std::cout << "directed edges for degree: ";
-    std::cout << num_edges_/num_nodes_ << std::endl;
+    PrintAligned("Nodes", num_nodes_);
+    PrintAligned("Edges", num_edges_);
+    PrintLabel("Directed", directed_ ? "Yes" : "No");
+    PrintAligned("Degree", num_edges_/num_nodes_);
   }
 
   void PrintTopology() const {

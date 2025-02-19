@@ -109,8 +109,6 @@ class CLBase {
   bool in_place() const { return in_place_; }
 };
 
-
-
 class CLApp : public CLBase {
   bool do_analysis_ = false;
   int num_trials_ = 16;
@@ -146,7 +144,27 @@ class CLApp : public CLBase {
   bool logging_en() const { return enable_logging_; }
 };
 
+class CLBFSApp : public CLApp {
+  std::string output_name_ = "";
+  bool structured_output_ = false;
 
+ public:
+  CLBFSApp(int argc, char** argv, std::string name) : CLApp(argc, argv, name) {
+    get_args_ += "o:";
+    AddHelpLine('o', "file", "enable structured output and write to given filename", "false");
+  }
+
+  void HandleArg(signed char opt, char* opt_arg) override {
+    switch (opt) {
+      case 'o': structured_output_ = true; output_name_ = std::string(opt_arg); break;
+      default: CLApp::HandleArg(opt, opt_arg);
+    }
+  }
+
+  bool structured_output() const { return structured_output_; }
+  std::string output_name() const { return output_name_; }
+  std::string name() const { return name_; }
+};
 
 class CLIterApp : public CLApp {
   int num_iters_;

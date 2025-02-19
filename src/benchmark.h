@@ -10,12 +10,16 @@
 #include <random>
 #include <utility>
 #include <vector>
+#include <omp.h>
 
 #include "builder.h"
 #include "graph.h"
 #include "timer.h"
 #include "util.h"
 #include "writer.h"
+#include "json.h"
+
+using json = nlohmann::json;
 
 
 /*
@@ -101,6 +105,7 @@ void BenchmarkKernel(const CLApp &cli, const GraphT_ &g,
                      GraphFunc kernel, AnalysisFunc stats,
                      VerifierFunc verify) {
   g.PrintStats();
+  printf("\n");
   double total_seconds = 0;
   Timer trial_timer;
   for (int iter=0; iter < cli.num_trials(); iter++) {
@@ -118,8 +123,58 @@ void BenchmarkKernel(const CLApp &cli, const GraphT_ &g,
       trial_timer.Stop();
       PrintTime("Verification Time", trial_timer.Seconds());
     }
+    printf("\n");
   }
   PrintTime("Average Time", total_seconds / cli.num_trials());
+}
+
+template<typename GraphT_, typename GraphFunc, typename AnalysisFunc,
+         typename VerifierFunc>
+json BenchmarkKernelWithStructuredOutput(const CLBFSApp &cli, const GraphT_ &g,
+                     GraphFunc kernel, AnalysisFunc stats,
+                     VerifierFunc verify) {
+  if (!cli.structured_output()) {
+    BenchmarkKernel(cli, g, kernel, stats, verify);
+    return json();
+  }
+  g.PrintStats();
+  json structured_output;
+  structured_output["nodes"] = g.num_nodes();
+  structured_output["edges"] = g.num_edges_directed();
+  structured_output["degree"] = g.num_edges() / g.num_nodes();
+  structured_output["threads"] = omp_get_max_threads();
+  structured_output["name"] = cli.name();
+  json times = json::array();
+  json run_details = json::array();
+  double total_seconds = 0;
+  Timer trial_timer;
+  for (int iter=0; iter < cli.num_trials(); iter++) {
+    json run_detail;
+    trial_timer.Start();
+    auto result = kernel(g);
+    trial_timer.Stop();
+    PrintTime("Trial Time", trial_timer.Seconds());
+    times.push_back(trial_timer.Seconds());
+    run_detail["time"] = trial_timer.Seconds();
+    total_seconds += trial_timer.Seconds();
+    if (cli.do_analysis() && (iter == (cli.num_trials()-1)))
+      stats(g, result);
+    if (cli.do_verify()) {
+      trial_timer.Start();
+      bool pass = verify(std::ref(g), std::ref(result));
+      PrintLabel("Verification",
+                 pass ? "PASS" : "FAIL");
+      trial_timer.Stop();
+      run_detail["passed"] = pass;
+      PrintTime("Verification Time", trial_timer.Seconds());
+    }
+    run_details.push_back(run_detail);
+  }
+  structured_output["times"] = times;
+  structured_output["run_details"] = run_details;
+  structured_output["average_time"] = total_seconds / cli.num_trials();
+  PrintTime("Average Time", total_seconds / cli.num_trials());
+  return structured_output;
 }
 
 #endif  // BENCHMARK_H_
