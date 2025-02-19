@@ -22,34 +22,6 @@ class DCBOQueueBase {
 protected:
     static thread_local mt19937 _generator;
     static thread_local uniform_int_distribution<int> _distribution;
-
-    inline size_t optimal_enqueue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues) {
-        size_t min_index = _distribution(_generator);
-        size_t min_enqueue_count = sub_queues[min_index]->enqueue_count();
-        for (size_t i = 1; i < SampleSize; ++i) {
-            auto random_index = _distribution(_generator);
-            auto enqueue_count = sub_queues[random_index]->enqueue_count();
-            if (enqueue_count < min_enqueue_count) {
-                min_enqueue_count = enqueue_count;
-                min_index = random_index;
-            }
-        }
-        return min_index;
-    }
-
-    inline size_t optimal_dequeue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues) {
-        size_t min_index = _distribution(_generator);
-        size_t min_dequeue_count = sub_queues[min_index]->dequeue_count();
-        for (size_t i = 1; i < SampleSize; ++i) {
-            auto random_index = _distribution(_generator);
-            auto dequeue_count = sub_queues[random_index]->dequeue_count();
-            if (dequeue_count < min_dequeue_count) {
-                min_dequeue_count = dequeue_count;
-                min_index = random_index;
-            }
-        }
-        return min_index;
-    }
 };
 
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
@@ -109,6 +81,34 @@ public:
                 return false;
             }
         }
+    }
+
+        inline size_t optimal_enqueue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues) {
+        size_t min_index = this->_distribution(this->_generator);
+        size_t min_enqueue_count = sub_queues[min_index]->enqueue_count();
+        for (size_t i = 1; i < SampleSize; ++i) {
+            auto random_index = this->_distribution(this->_generator);
+            auto enqueue_count = sub_queues[random_index]->enqueue_count();
+            if (enqueue_count < min_enqueue_count) {
+                min_enqueue_count = enqueue_count;
+                min_index = random_index;
+            }
+        }
+        return min_index;
+    }
+
+    inline size_t optimal_dequeue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues) {
+        size_t min_index = this->_distribution(this->_generator);
+        size_t min_dequeue_count = sub_queues[min_index]->dequeue_count();
+        for (size_t i = 1; i < SampleSize; ++i) {
+            auto random_index = this->_distribution(this->_generator);
+            auto dequeue_count = sub_queues[random_index]->dequeue_count();
+            if (dequeue_count < min_dequeue_count) {
+                min_dequeue_count = dequeue_count;
+                min_index = random_index;
+            }
+        }
+        return min_index;
     }
 };
 

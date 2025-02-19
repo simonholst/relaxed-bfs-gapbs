@@ -90,7 +90,7 @@
     #define ENQUEUE(val) queue.enqueue(val, thread_id)
     #define DEQUEUE(val) queue.dequeue(val, thread_id)
     #define QUEUE(type) DCBOQueue<FAAArrayQueueInt, int32_t, D, NUM_SUBQUEUES> queue
-    #define QUEUE_TYPE "d-CBO FAA"
+    #define QUEUE_TYPE "d-CBO FAA Int"
 #endif
 
 #ifndef QUEUE
