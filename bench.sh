@@ -8,14 +8,14 @@ thread_numbers="$@"
 timestamp=$(date +%Y%m%d_%H%M%S)
 base_path="bench_results/$timestamp"
 
-queues=("DCBO_FAA" "DCBO_MS" "FAA" "MS")
+queues=("DCBO_FAA_INT" "DCBO_FAA" "DCBO_MS" "FAA" "MS")
 
 for queue in "${queues[@]}"
 do
-    make relax_concurrent_bfs_node QUEUE=$queue DEBUG=TRUE
+    make relax_concurrent_bfs QUEUE=$queue DEBUG=TRUE
     for threads in $thread_numbers
     do
-        OMP_NUM_THREADS=$threads ./bin/relax_concurrent_bfs_node $bfs_arguments -o ${queue}_debug_${threads}
+        OMP_NUM_THREADS=$threads ./bin/relax_concurrent_bfs $bfs_arguments -o ${queue}_debug_${threads}
     done
 
     mkdir -p $base_path/${queue}_debug
@@ -24,10 +24,10 @@ done
 
 for queue in "${queues[@]}"
 do
-    make relax_concurrent_bfs_node QUEUE=$queue DEBUG=FALSE
+    make relax_concurrent_bfs QUEUE=$queue DEBUG=FALSE
     for threads in $thread_numbers
     do
-        OMP_NUM_THREADS=$threads ./bin/relax_concurrent_bfs_node $bfs_arguments -o ${queue}_${threads}
+        OMP_NUM_THREADS=$threads ./bin/relax_concurrent_bfs $bfs_arguments -o ${queue}_${threads}
     done
 
     mkdir -p $base_path/$queue
