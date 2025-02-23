@@ -26,6 +26,14 @@ ifneq ($(QUEUE), )
 	RELAX_FLAGS += -D$(QUEUE)
 endif
 
+ifneq ($(N_SAMPLES), )
+	RELAX_FLAGS += -DN_SAMPLES=$(N_SAMPLES)
+endif
+
+ifneq ($(N_SUBQUEUES), )
+	RELAX_FLAGS += -DN_SUBQUEUES=$(N_SUBQUEUES)
+endif
+
 KERNELS = bc bfs cc cc_sv pr pr_spmv sssp tc
 SUITE = $(KERNELS) converter
 

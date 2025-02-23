@@ -153,11 +153,19 @@ int main(int argc, char *argv[]) {
 
     PrintAligned("Threads", omp_get_max_threads());
     PrintLabel("Queue", QUEUE_TYPE);
+    #ifdef DCBO
+        PrintAligned("d-CBO Samples", N_SAMPLES);
+        PrintAligned("d-CBO Subqueues", N_SUBQUEUES);
+    #endif
     auto structured_output = BenchmarkKernelWithStructuredOutput(cli, g, BFSBound, PrintBFSStats, VerifierBound);
 
     if (cli.structured_output()) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
+        #ifdef DCBO
+            structured_output["dcbo_samples"] = N_SAMPLES;
+            structured_output["dcbo_subqueues"] = N_SUBQUEUES;
+        #endif
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];
