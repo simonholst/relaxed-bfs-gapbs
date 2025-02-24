@@ -50,12 +50,16 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     ENQUEUE(source_id);
     NodeID node_id;
     active_threads = 0;
+    uint64_t enqueues_local = 0;
+    uint64_t dequeues_local = 0;
+    uint64_t enqueues_total = 0;
+    uint64_t dequeues_total = 0;
 
     #ifdef DEBUG
-    #pragma omp parallel private(is_active, node_id, thread_id, nodes_revisited_local, nodes_visited_local)
+    #pragma omp parallel private(is_active, node_id, thread_id, nodes_revisited_local, nodes_visited_local, enqueues_local, dequeues_local)
     #endif
     #ifndef DEBUG
-    #pragma omp parallel private(is_active, node_id, thread_id)
+    #pragma omp parallel private(is_active, node_id, thread_id, enqueues_local, dequeues_local)
     #endif
     {
         thread_id = omp_get_thread_num();
@@ -63,10 +67,16 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         nodes_revisited_local = 0;
         nodes_visited_local = 0;
         #endif
+        dequeues_local = 0;
+        enqueues_local = 0;
         while (failures < MAX_FAILURES || active_threads != 0) {
             while(DEQUEUE(node_id)) {
+                dequeues_local += 1;
                 #ifdef DEBUG
                     nodes_visited_local += 1;
+                    if (nodes_visited_local % 1000000 == 0) {
+                        cout << "Thread " << thread_id << " visited " << nodes_visited_local << " nodes" << endl;
+                    }
                 #endif
                 if (!is_active) {
                     fetch_and_add(active_threads, 1);
@@ -89,6 +99,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                         Node updated_node = {node_id, new_depth};
                         if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
                             ENQUEUE(neighbor_id);
+                            enqueues_local += 1;
                             break;
                         }
                         neighbor = node_to_parent_and_depth[neighbor_id];
@@ -109,6 +120,11 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         #pragma omp atomic
         nodes_visited_total += nodes_visited_local;
         #endif
+        #pragma omp atomic
+        enqueues_total += enqueues_local;
+
+        #pragma omp atomic
+        dequeues_total += dequeues_local;
     }
 
     pvector<NodeID> result(node_to_parent_and_depth.size());
@@ -124,6 +140,9 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     nodes_visited_vec.push_back(nodes_visited_total);
     nodes_revisited_vec.push_back(nodes_revisited_total);
     #endif
+    PrintAligned("Enqueues", enqueues_total + 1);
+    PrintAligned("Dequeues", dequeues_total);
+    std::cout << std::flush;
     return result;
 }
 
