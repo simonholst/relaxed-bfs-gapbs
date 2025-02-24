@@ -172,11 +172,14 @@ public:
 
     bool dequeue(ElementType& item, int thread_id) {
         auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
-        return this->faaaq_dequeue(min_index, item, thread_id);
+        if (this->faaaq_dequeue(min_index, item, thread_id)) {
+            return true;
+        }
+        return this->double_collect(item, thread_id);
     }
 
     bool double_collect(ElementType& item, int thread_id) {
-        auto versions = array<uint16_t, SubQueueCount>();
+        auto versions = array<int, SubQueueCount>();
         while (true) {
             for (int i = 0; i < SubQueueCount; ++i) {
                 versions[i] = _sub_queues[i]->enqueue_version(thread_id);
@@ -249,15 +252,19 @@ public:
     bool dequeue(int32_t& item, int thread_id) {
         auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
         item = _sub_queues[min_index]->dequeue(thread_id);
-        return item != -1;
+        if (item != -1) {
+            return true;
+        }
+        return this->double_collect(item, thread_id);
     }
 
     bool double_collect(int32_t& item, int thread_id) {
-        auto versions = array<uint16_t, SubQueueCount>();
+        auto versions = array<int, SubQueueCount>();
         while (true) {
             for (int i = 0; i < SubQueueCount; ++i) {
                 versions[i] = _sub_queues[i]->enqueue_version(thread_id);
-                if (this->dequeue(item, thread_id)) {
+                item = _sub_queues[i]->dequeue(thread_id);
+                if (item != -1) {
                     return true;
                 }
             }
