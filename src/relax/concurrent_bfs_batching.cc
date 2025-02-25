@@ -66,11 +66,28 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         #ifdef DEBUG
         nodes_revisited_local = 0;
         nodes_visited_local = 0;
+        double batching_percentage = 0;
         #endif
 
         while (termination_detection.repeat([&]() {
             return DEQUEUE(dequeue_array);
         })) {
+
+            #ifdef DEBUG
+            int nr_filled = 0;
+            for (NodeID node_id : dequeue_array) {
+                if (node_id != -1) {
+                    nr_filled++;
+                }
+            }
+            double percentage = (double)nr_filled / (BATCH_SIZE);
+
+            if (batching_percentage == 0) {
+                batching_percentage = percentage;
+            } else {
+                batching_percentage = (batching_percentage + percentage) / 2;
+            }
+            #endif
 
             uint8_t enqueue_counter = 0;
 
@@ -127,6 +144,10 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         nodes_revisited_total += nodes_revisited_local;
         #pragma omp atomic
         nodes_visited_total += nodes_visited_local;
+        #pragma omp critical
+        {
+            PrintTime("Batching percentage", batching_percentage);
+        }
         #endif
     }
 
