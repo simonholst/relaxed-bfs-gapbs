@@ -20,8 +20,6 @@
 
 using json = nlohmann::json;
 
-#define MAX_FAILURES         1000
-
 volatile uint64_t active_threads;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
@@ -40,25 +38,23 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     source_node_vec.push_back(source_id);
     #endif
 
-    bool is_active = false;
-    uint64_t failures = 0;
     int thread_id = omp_get_thread_num();
 
     pvector<Node> node_to_parent_and_depth = pvector<Node>(g.num_nodes());
     QUEUE(NodeID);
     node_to_parent_and_depth[source_id] = {source_id, 0};
     ENQUEUE(source_id);
-    NodeID node_id;
     active_threads = 0;
     termination_detection::TerminationDetection termination_detection(omp_get_max_threads());
 
     #ifdef DEBUG
-    #pragma omp parallel private(is_active, node_id, thread_id, nodes_revisited_local, nodes_visited_local)
+    #pragma omp parallel private(thread_id, nodes_revisited_local, nodes_visited_local)
     #endif
     #ifndef DEBUG
-    #pragma omp parallel private(is_active, node_id, thread_id)
+    #pragma omp parallel private(thread_id)
     #endif
     {
+        NodeID node_id;
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
         nodes_revisited_local = 0;
@@ -71,11 +67,6 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             #ifdef DEBUG
                 nodes_visited_local += 1;
             #endif
-            if (!is_active) {
-                fetch_and_add(active_threads, 1);
-                is_active = true;
-                failures = 0;
-            }
             Node node = node_to_parent_and_depth[node_id];
             uint32_t depth = node.depth;
             uint32_t new_depth = depth + 1;
