@@ -45,6 +45,26 @@
     #define QUEUE_TYPE "FAA Array Queue Int"
 #endif
 
+#ifdef FAA_BATCHING
+    #include "faa_array_queue.h"
+
+    template <typename T>
+    inline bool dequeue(FAAArrayQueue<T>& queue, T& val, int tid) {
+        T* elem = queue.dequeue(tid);
+        if (elem == nullptr) {
+            return false;
+        }
+        val = *elem;
+        delete elem;
+        return true;
+    }
+
+    #define ENQUEUE(val) queue.enqueue(new auto(val), thread_id)
+    #define DEQUEUE(val) dequeue(queue, val, thread_id)
+    #define QUEUE(type) FAAArrayQueue<type> queue
+    #define QUEUE_TYPE "FAA Array Queue with Batching"
+#endif
+
 #ifdef DCBO_MS
     #include "subqueues.h"
 
