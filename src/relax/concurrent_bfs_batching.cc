@@ -20,7 +20,9 @@
 
 using json = nlohmann::json;
 
-#define BATCH_SIZE 4
+#ifndef BATCH_SIZE
+    #define BATCH_SIZE 8
+#endif
 
 volatile uint64_t active_threads;
 std::vector<uint64_t> source_node_vec;
@@ -46,7 +48,9 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     pvector<Node> node_to_parent_and_depth = pvector<Node>(g.num_nodes());
     QUEUE(NodeIdArray);
     node_to_parent_and_depth[source_id] = {source_id, 0};
-    NodeIdArray source = {source_id, -1, -1, -1};
+    NodeIdArray source;
+    source[0] = source_id;
+    source[1] = -1;
     ENQUEUE(source);
     
     active_threads = 0;
@@ -60,7 +64,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     #endif
     {
         NodeIdArray dequeue_array;
-        NodeIdArray enqueue_array = {-1, -1, -1, -1};
+        NodeIdArray enqueue_array;
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
@@ -103,7 +107,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                             enqueue_array[enqueue_counter] = neighbor_id;
                             if (enqueue_counter >= BATCH_SIZE - 1) {
                                 ENQUEUE(enqueue_array);
-                                enqueue_array = NodeIdArray{-1, -1, -1, -1};
+                                enqueue_array = NodeIdArray();
                                 enqueue_counter = 0;
                             } else {
                                 enqueue_counter++;
@@ -172,6 +176,7 @@ int main(int argc, char *argv[]) {
 
     PrintAligned("Threads", omp_get_max_threads());
     PrintLabel("Queue", QUEUE_TYPE);
+    PrintAligned("Batch Size", BATCH_SIZE);
     auto structured_output = BenchmarkKernelWithStructuredOutput(cli, g, BFSBound, PrintBFSStats, VerifierBound);
 
     if (cli.structured_output()) {
