@@ -14,18 +14,19 @@
 #include "boost/lockfree/queue.hpp"
 #include "faa_array_queue.h"
 #include "faa_array_queue_int.h"
+#include "xoshiro.h"
 
 using namespace std;
 
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
 class DCBOQueueBase {
 protected:
-    static thread_local mt19937 _generator;
+    static thread_local XoshiroCpp::Xoshiro256Plus _generator;
     static thread_local uniform_int_distribution<int> _distribution;
 };
 
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
-thread_local mt19937 DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::_generator{random_device{}()};
+thread_local XoshiroCpp::Xoshiro256Plus DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::_generator{random_device{}()};
 
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
 thread_local uniform_int_distribution<int> DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::_distribution{0, SubQueueCount - 1};
