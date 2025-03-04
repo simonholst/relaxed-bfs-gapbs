@@ -25,8 +25,37 @@ std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
 
-pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false)
-{
+template <typename Q>
+void SequentialStart(const Graph &g, pvector<Node> &parent_array, Q &queue, NodeID source_id, int thread_id, int nr_iterations) {
+    std::queue<NodeID> seq_queue;
+    seq_queue.push(source_id);
+    int counter = 0;
+    NodeID node_id;
+    while (!seq_queue.empty() && counter < nr_iterations) {
+        node_id = seq_queue.front();
+        seq_queue.pop();
+        g.out_neigh(node_id);
+        for (NodeID neighbor_id : g.out_neigh(node_id)) {
+            NodeID curr_parent = parent_array[neighbor_id].parent;
+            if (curr_parent < 0) {
+                uint32_t curr_depth = parent_array[node_id].depth;
+                uint32_t new_depth = curr_depth + 1;
+                Node updated_node = {node_id, new_depth};
+                parent_array[neighbor_id] = updated_node;
+                seq_queue.push(neighbor_id);
+            }
+        }
+        counter++;
+    }
+    // transfer to concurrent queue
+    while (!seq_queue.empty()) {
+        node_id = seq_queue.front();
+        seq_queue.pop();
+        ENQUEUE(node_id);
+    }
+}
+
+pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false) {
     #ifdef DEBUG
     uint64_t nodes_revisited_local = 0;
     uint64_t nodes_revisited_total = 0;
@@ -43,7 +72,15 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     pvector<Node> node_to_parent_and_depth = pvector<Node>(g.num_nodes());
     QUEUE(NodeID);
     node_to_parent_and_depth[source_id] = {source_id, 0};
+
+    #ifdef SEQ_START
+    SequentialStart(g, node_to_parent_and_depth, queue, source_id, thread_id, SEQ_START);
+    #endif
+    #ifndef SEQ_START
+    #define SEQ_START 0
     ENQUEUE(source_id);
+    #endif
+
     active_threads = 0;
     termination_detection::TerminationDetection termination_detection(omp_get_max_threads());
 
@@ -65,7 +102,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             return DEQUEUE(node_id);
         })) {
             #ifdef DEBUG
-                nodes_visited_local += 1;
+            nodes_visited_local += 1;
             #endif
             Node node = node_to_parent_and_depth[node_id];
             uint32_t depth = node.depth;
@@ -106,6 +143,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     }
     #ifdef DEBUG
     if (logging_enabled) {
+        PrintAligned("Seq-Start", SEQ_START);
         PrintAligned("Nodes visited", nodes_visited_total);
         PrintAligned("Nodes revisited", nodes_revisited_total);
     }
@@ -146,6 +184,7 @@ int main(int argc, char *argv[]) {
     if (cli.structured_output()) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
+        structured_output["seq_start"] = SEQ_START;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];

@@ -38,6 +38,10 @@ ifneq ($(BATCH_SIZE), )
 	RELAX_FLAGS += -DBATCH_SIZE=$(BATCH_SIZE)
 endif
 
+ifneq ($(SEQ_START), )
+	RELAX_FLAGS += -DSEQ_START=$(SEQ_START)
+endif
+
 KERNELS = bc bfs cc cc_sv pr pr_spmv sssp tc
 SUITE = $(KERNELS) converter
 
