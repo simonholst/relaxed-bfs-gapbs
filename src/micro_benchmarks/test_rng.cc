@@ -32,4 +32,26 @@ int main() {
     elapsed = end - start;
     std::cout << "Mersenne Twister: " << elapsed.count() << " seconds" << std::endl;
     std::cout << sum << std::endl;
+
+    sum = 0;
+    Xoshiro256Plus xoshiro256p(std::random_device{}());
+    start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < N; ++i) {
+        sum += dist(xoshiro256p);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "Xoshiro 256+: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << sum << std::endl;
+
+    sum = 0;
+    Xoroshiro128StarStar xoshiro128ss(std::random_device{}());
+    start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < N; ++i) {
+        sum += dist(xoshiro128ss);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cout << "Xoroshiro 128**: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << sum << std::endl;
 }
