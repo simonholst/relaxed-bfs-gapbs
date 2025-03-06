@@ -28,6 +28,7 @@ volatile uint64_t active_threads;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
+std::vector<std::string> dec_success_vec;
 typedef std::array<NodeID, BATCH_SIZE> NodeIdArray;
 
 template <typename Q>
@@ -116,6 +117,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     #pragma omp parallel private(thread_id)
     #endif
     {
+        std::vector<bool> deq_vec;
         NodeIdArray dequeue_array;
         NodeIdArray enqueue_array;
         
@@ -126,6 +128,11 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         #endif
 
         while (termination_detection.repeat([&]() {
+            auto d = SINGLE_DEQUEUE(dequeue_array);
+            deq_vec.push_back(d);
+            if (d) {
+                return true;
+            }
             return DEQUEUE(dequeue_array);
         })) {
 
@@ -185,6 +192,15 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         #pragma omp atomic
         nodes_visited_total += nodes_visited_local;
         #endif
+        std::string dec_string;
+        for (bool val : deq_vec) {
+            dec_string += (val ? '1' : '0');
+        }
+
+        #pragma omp critical
+        {
+            dec_success_vec.push_back(dec_string);
+        }
     }
 
     pvector<NodeID> result(node_to_parent_and_depth.size());
@@ -237,6 +253,7 @@ int main(int argc, char *argv[]) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
         structured_output["seq_start"] = SEQ_START;
+        structured_output["dequeues"] = dec_success_vec;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];
