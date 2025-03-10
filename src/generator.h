@@ -13,6 +13,7 @@
 #include "graph.h"
 #include "pvector.h"
 #include "util.h"
+#include "command_line.h"
 
 
 /*
@@ -81,6 +82,7 @@ class Generator {
     scale_ = scale;
     num_nodes_ = 1l << scale;
     num_edges_ = num_nodes_ * degree;
+    degree_ = degree;
     if (num_nodes_ > std::numeric_limits<NodeID_>::max()) {
       std::cout << "NodeID type (max: " << std::numeric_limits<NodeID_>::max();
       std::cout << ") too small to hold " << num_nodes_ << std::endl;
@@ -119,6 +121,27 @@ class Generator {
     return el;
   }
 
+  EdgeList MakeParChainEL() {
+    int64_t nodes_per_chain = num_nodes_;
+    int64_t num_chains = degree_;
+    EdgeList el(nodes_per_chain * degree_);
+    for (int64_t c=0; c < num_chains; c++) {
+      auto i = c*nodes_per_chain;
+      el[i] = Edge(0, i + 1);
+      NodeID_ curr = 1;
+      NodeID_ next = 2;
+      while (next <= nodes_per_chain) {
+        NodeID_ v = c*nodes_per_chain + curr;
+        NodeID_ u = c*nodes_per_chain + next;
+        el[v] = Edge(v, u);
+        curr = next;
+        next++;
+      }
+    }
+
+    return el;
+  }
+
   EdgeList MakeRMatEL() {
     const uint32_t max = std::numeric_limits<uint32_t>::max();
     const uint32_t A = 0.57*max, B = 0.19*max, C = 0.19*max;
@@ -154,14 +177,25 @@ class Generator {
     return el;
   }
 
-  EdgeList GenerateEL(bool uniform) {
+  EdgeList GenerateEL(GraphType graphType) {
     EdgeList el;
     Timer t;
     t.Start();
-    if (uniform)
-      el = MakeUniformEL();
-    else
-      el = MakeRMatEL();
+    
+    switch (graphType) {
+      case GraphType::UNIFORM:
+        el = MakeUniformEL();
+        break;
+      case GraphType::KRONECKER:
+        el = MakeRMatEL();
+        break;
+      case GraphType::PAR_CHAINS:
+        el = MakeParChainEL();
+        break;
+      default:
+        std::cerr << "Unknown graph type" << std::endl;
+        std::exit(-1);
+    }
     t.Stop();
     PrintTime("Generate Time", t.Seconds());
     return el;
@@ -190,6 +224,7 @@ class Generator {
   int scale_;
   int64_t num_nodes_;
   int64_t num_edges_;
+  int64_t degree_;
   static const int64_t block_size = 1<<18;
 };
 

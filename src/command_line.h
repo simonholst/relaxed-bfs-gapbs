@@ -24,6 +24,12 @@ Handles command line argument parsing
  - For example, most kernels will use CLApp
 */
 
+enum class GraphType {
+  KRONECKER,
+  UNIFORM,
+  PAR_CHAINS
+};
+
 
 class CLBase {
  protected:
@@ -39,6 +45,7 @@ class CLBase {
   bool symmetrize_ = false;
   bool uniform_ = false;
   bool in_place_ = false;
+  GraphType graph_type_ = GraphType::KRONECKER;
 
   void AddHelpLine(char opt, std::string opt_arg, std::string text,
                    std::string def = "") {
@@ -107,6 +114,7 @@ class CLBase {
   bool symmetrize() const { return symmetrize_; }
   bool uniform() const { return uniform_; }
   bool in_place() const { return in_place_; }
+  GraphType graph_type() const { return graph_type_; }
 };
 
 class CLApp : public CLBase {
@@ -150,13 +158,26 @@ class CLBFSApp : public CLApp {
 
  public:
   CLBFSApp(int argc, char** argv, std::string name) : CLApp(argc, argv, name) {
-    get_args_ += "o:";
+    get_args_ += "o:t:";
     AddHelpLine('o', "file", "enable structured output and write to given filename", "false");
+    AddHelpLine('t', "graph-type", "graph type (kronecker, uniform, par-chains)", "kronecker");
   }
 
   void HandleArg(signed char opt, char* opt_arg) override {
     switch (opt) {
       case 'o': structured_output_ = true; output_name_ = std::string(opt_arg); break;
+      case 't':
+      if (std::string(opt_arg) == "kronecker") {
+        graph_type_ = GraphType::KRONECKER;
+      } else if (std::string(opt_arg) == "uniform") {
+        graph_type_ = GraphType::UNIFORM;
+      } else if (std::string(opt_arg) == "par-chains") {
+        graph_type_ = GraphType::PAR_CHAINS;
+      } else {
+        std::cerr << "Unknown graph type: " << opt_arg << std::endl;
+        std::exit(1);
+      }
+      break;
       default: CLApp::HandleArg(opt, opt_arg);
     }
   }

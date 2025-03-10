@@ -44,7 +44,7 @@ pvector<NodeID> SequentialBFS(const Graph &g, NodeID source, bool logging_enable
 
 int main(int argc, char* argv[])
 {
-    CLApp cli(argc, argv, "relaxed breadth-first search");
+    CLBFSApp cli(argc, argv, "Sequential BFS");
 
     if (!cli.ParseArgs()) {
         printf("Exiting");
