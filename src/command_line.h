@@ -160,7 +160,7 @@ class CLBFSApp : public CLApp {
   CLBFSApp(int argc, char** argv, std::string name) : CLApp(argc, argv, name) {
     get_args_ += "o:t:";
     AddHelpLine('o', "file", "enable structured output and write to given filename", "false");
-    AddHelpLine('t', "graph-type", "graph type (kronecker, uniform, par-chains)", "kronecker");
+    AddHelpLine('t', "graph-type", "graph type (kronecker, uniform, par-chains). For par-chains: should be run with -r 0, -k sets number of chains, -g sets chain length", "kronecker");
   }
 
   void HandleArg(signed char opt, char* opt_arg) override {
