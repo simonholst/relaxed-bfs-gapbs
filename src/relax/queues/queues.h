@@ -66,7 +66,7 @@
 #endif
 
 #ifdef DCBO_MS
-    #include "subqueues.h"
+    #include "dcbo.h"
 
     #define DCBO
 
@@ -84,7 +84,7 @@
 #endif
 
 #ifdef DCBO_FAA
-    #include "subqueues.h"
+    #include "dcbo.h"
 
     #define DCBO
 
@@ -102,7 +102,7 @@
 #endif
 
 #ifdef DCBO_FAA_INT
-    #include "subqueues.h"
+    #include "dcbo.h"
 
     #define DCBO
 

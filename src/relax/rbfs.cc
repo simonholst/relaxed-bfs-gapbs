@@ -20,15 +20,41 @@
 
 using json = nlohmann::json;
 
-#define MAX_FAILURES         1000
-
-volatile uint64_t active_threads;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
 
-pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false)
-{
+template <typename Q>
+void SequentialStart(const Graph &g, pvector<Node> &parent_array, Q &queue, NodeID source_id, int thread_id, int nr_iterations) {
+    std::queue<NodeID> seq_queue;
+    seq_queue.push(source_id);
+    int counter = 0;
+    NodeID node_id;
+    while (!seq_queue.empty() && counter < nr_iterations) {
+        node_id = seq_queue.front();
+        seq_queue.pop();
+        g.out_neigh(node_id);
+        for (NodeID neighbor_id : g.out_neigh(node_id)) {
+            NodeID curr_parent = parent_array[neighbor_id].parent;
+            if (curr_parent < 0) {
+                uint32_t curr_depth = parent_array[node_id].depth;
+                uint32_t new_depth = curr_depth + 1;
+                Node updated_node = {node_id, new_depth};
+                parent_array[neighbor_id] = updated_node;
+                seq_queue.push(neighbor_id);
+            }
+        }
+        counter++;
+    }
+    // transfer to concurrent queue
+    while (!seq_queue.empty()) {
+        node_id = seq_queue.front();
+        seq_queue.pop();
+        ENQUEUE(node_id);
+    }
+}
+
+pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false) {
     #ifdef DEBUG
     uint64_t nodes_revisited_local = 0;
     uint64_t nodes_revisited_total = 0;
@@ -40,69 +66,65 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     source_node_vec.push_back(source_id);
     #endif
 
-    bool is_active = false;
-    uint64_t failures = 0;
     int thread_id = omp_get_thread_num();
 
-    pvector<Node> node_to_parent_and_depth = pvector<Node>(g.num_nodes());
+    pvector<Node> parent_array = pvector<Node>(g.num_nodes());
     QUEUE(NodeID);
-    node_to_parent_and_depth[source_id] = {source_id, 0};
+    parent_array[source_id] = {source_id, 0};
+
+    #ifdef SEQ_START
+    SequentialStart(g, parent_array, queue, source_id, thread_id, SEQ_START);
+    #endif
+    #ifndef SEQ_START
+    #define SEQ_START 0
     ENQUEUE(source_id);
-    NodeID node_id;
-    active_threads = 0;
+    #endif
+
+    termination_detection::TerminationDetection termination_detection(omp_get_max_threads());
 
     #ifdef DEBUG
-    #pragma omp parallel private(is_active, node_id, thread_id, nodes_revisited_local, nodes_visited_local)
+    #pragma omp parallel private(thread_id, nodes_revisited_local, nodes_visited_local)
     #endif
     #ifndef DEBUG
-    #pragma omp parallel private(is_active, node_id, thread_id)
+    #pragma omp parallel private(thread_id)
     #endif
     {
+        NodeID node_id;
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
         nodes_revisited_local = 0;
         nodes_visited_local = 0;
         #endif
-        while (failures < MAX_FAILURES || active_threads != 0) {
-            while(DEQUEUE(node_id)) {
-                #ifdef DEBUG
-                    nodes_visited_local += 1;
-                #endif
-                if (!is_active) {
-                    fetch_and_add(active_threads, 1);
-                    is_active = true;
-                    failures = 0;
-                }
-                Node node = node_to_parent_and_depth[node_id];
-                uint32_t depth = node.depth;
-                uint32_t new_depth = depth + 1;
 
-                for (NodeID neighbor_id : g.out_neigh(node_id)) {
-                    Node neighbor = node_to_parent_and_depth[neighbor_id];
-                    uint32_t neighbor_depth = neighbor.depth;
-                    while (new_depth < neighbor_depth) {
-                        #ifdef DEBUG
-                        if (neighbor_depth != MAX_DEPTH) {
-                            nodes_revisited_local += 1;
-                        }
-                        #endif
-                        Node updated_node = {node_id, new_depth};
-                        if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
-                            ENQUEUE(neighbor_id);
-                            break;
-                        }
-                        neighbor = node_to_parent_and_depth[neighbor_id];
-                        neighbor_depth = neighbor.depth;
+        while (termination_detection.repeat([&]() {
+            return DEQUEUE(node_id);
+        })) {
+            #ifdef DEBUG
+            nodes_visited_local += 1;
+            #endif
+            uint32_t depth = parent_array[node_id].depth;
+            uint32_t new_depth = depth + 1;
+
+            for (NodeID neighbor_id : g.out_neigh(node_id)) {
+                Node neighbor = parent_array[neighbor_id];
+                uint32_t neighbor_depth = neighbor.depth;
+                while (new_depth < neighbor_depth) {
+                    #ifdef DEBUG
+                    if (neighbor_depth != MAX_DEPTH) {
+                        nodes_revisited_local += 1;
                     }
+                    #endif
+                    Node updated_node = {node_id, new_depth};
+                    if (compare_and_swap(parent_array[neighbor_id], neighbor, updated_node)) {
+                        ENQUEUE(neighbor_id);
+                        break;
+                    }
+                    neighbor = parent_array[neighbor_id];
+                    neighbor_depth = neighbor.depth;
                 }
             }
-            if (is_active)
-            {
-                fetch_and_sub(active_threads, 1);
-                is_active = false;
-            }
-            failures += 1;
         }
+
         #ifdef DEBUG
         #pragma omp atomic
         nodes_revisited_total += nodes_revisited_local;
@@ -111,13 +133,14 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         #endif
     }
 
-    pvector<NodeID> result(node_to_parent_and_depth.size());
+    pvector<NodeID> result(parent_array.size());
     #pragma omp parallel for
-    for (size_t i = 0; i < node_to_parent_and_depth.size(); i++) {
-        result[i] = node_to_parent_and_depth[i].parent;
+    for (size_t i = 0; i < parent_array.size(); i++) {
+        result[i] = parent_array[i].parent;
     }
     #ifdef DEBUG
     if (logging_enabled) {
+        PrintAligned("Seq-Start", SEQ_START);
         PrintAligned("Nodes visited", nodes_visited_total);
         PrintAligned("Nodes revisited", nodes_revisited_total);
     }
@@ -153,19 +176,12 @@ int main(int argc, char *argv[]) {
 
     PrintAligned("Threads", omp_get_max_threads());
     PrintLabel("Queue", QUEUE_TYPE);
-    #ifdef DCBO
-        PrintAligned("d-CBO Samples", N_SAMPLES);
-        PrintAligned("d-CBO Subqueues", N_SUBQUEUES);
-    #endif
     auto structured_output = BenchmarkKernelWithStructuredOutput(cli, g, BFSBound, PrintBFSStats, VerifierBound);
 
     if (cli.structured_output()) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
-        #ifdef DCBO
-            structured_output["dcbo_samples"] = N_SAMPLES;
-            structured_output["dcbo_subqueues"] = N_SUBQUEUES;
-        #endif
+        structured_output["seq_start"] = SEQ_START;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];

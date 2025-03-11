@@ -24,7 +24,6 @@ using json = nlohmann::json;
     #define BATCH_SIZE 8
 #endif
 
-volatile uint64_t active_threads;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
@@ -90,12 +89,12 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 
     int thread_id = omp_get_thread_num();
 
-    pvector<Node> node_to_parent_and_depth = pvector<Node>(g.num_nodes());
+    pvector<Node> parent_array = pvector<Node>(g.num_nodes());
     QUEUE(NodeIdArray);
-    node_to_parent_and_depth[source_id] = {source_id, 0};
+    parent_array[source_id] = {source_id, 0};
 
     #ifdef SEQ_START
-        SequentialStart(g, node_to_parent_and_depth, queue, source_id, thread_id, SEQ_START);
+        SequentialStart(g, parent_array, queue, source_id, thread_id, SEQ_START);
     #endif
     #ifndef SEQ_START
     #define SEQ_START 0
@@ -105,8 +104,6 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     ENQUEUE(source);
     #endif
     
-    
-    active_threads = 0;
     termination_detection::TerminationDetection termination_detection(omp_get_max_threads());
 
     #ifdef DEBUG
@@ -141,12 +138,12 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                 nodes_visited_local += 1;
                 #endif
 
-                Node node = node_to_parent_and_depth[node_id];
+                Node node = parent_array[node_id];
                 uint32_t depth = node.depth;
                 uint32_t new_depth = depth + 1;
 
                 for (NodeID neighbor_id : g.out_neigh(node_id)) {
-                    Node neighbor = node_to_parent_and_depth[neighbor_id];
+                    Node neighbor = parent_array[neighbor_id];
                     uint32_t neighbor_depth = neighbor.depth;
                     while (new_depth < neighbor_depth) {
                         #ifdef DEBUG
@@ -156,7 +153,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                         }
                         #endif
                         Node updated_node = {node_id, new_depth};
-                        if (compare_and_swap(node_to_parent_and_depth[neighbor_id], neighbor, updated_node)) {
+                        if (compare_and_swap(parent_array[neighbor_id], neighbor, updated_node)) {
                             enqueue_array[enqueue_counter] = neighbor_id;
                             if (enqueue_counter >= BATCH_SIZE - 1) {
                                 ENQUEUE(enqueue_array);
@@ -167,7 +164,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                             }
                             break;
                         }
-                        neighbor = node_to_parent_and_depth[neighbor_id];
+                        neighbor = parent_array[neighbor_id];
                         neighbor_depth = neighbor.depth;
                     }
                 }
@@ -187,10 +184,10 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         #endif
     }
 
-    pvector<NodeID> result(node_to_parent_and_depth.size());
+    pvector<NodeID> result(parent_array.size());
     #pragma omp parallel for
-    for (size_t i = 0; i < node_to_parent_and_depth.size(); i++) {
-        result[i] = node_to_parent_and_depth[i].parent;
+    for (size_t i = 0; i < parent_array.size(); i++) {
+        result[i] = parent_array[i].parent;
     }
     #ifdef DEBUG
     if (logging_enabled) {
