@@ -142,6 +142,26 @@ class Generator {
     return el;
   }
 
+  EdgeList MakeSquareEL() {
+    int64_t dimension = num_nodes_;
+    EdgeList el(2 * dimension * (dimension - 1));
+    int64_t i = 0;
+    
+    for (int64_t row = 0; row < dimension; row++) {
+      for (int64_t col = 0; col < dimension; col++) {
+        if (col + 1 < dimension) {
+          el[i] = Edge(row * dimension + col, row * dimension + col + 1);
+          i++;
+        }
+        if (row + 1 < dimension) {
+          el[i] = Edge(row * dimension + col, (row + 1) * dimension + col);
+          i++;  
+        }
+      }
+    }
+    return el;
+  }
+
   EdgeList MakeRMatEL() {
     const uint32_t max = std::numeric_limits<uint32_t>::max();
     const uint32_t A = 0.57*max, B = 0.19*max, C = 0.19*max;
@@ -192,11 +212,15 @@ class Generator {
       case GraphType::PAR_CHAINS:
         el = MakeParChainEL();
         break;
+      case GraphType::SQUARE:
+        el = MakeSquareEL();
+        break;
       default:
         std::cerr << "Unknown graph type" << std::endl;
         std::exit(-1);
     }
     t.Stop();
+    PrintLabel("Graph Type", GraphTypeToString(graphType));
     PrintTime("Generate Time", t.Seconds());
     return el;
   }
