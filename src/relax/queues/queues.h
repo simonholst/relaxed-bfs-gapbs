@@ -97,6 +97,7 @@
 
     #define ENQUEUE(val) queue.enqueue(val, thread_id)
     #define DEQUEUE(val) queue.dequeue(val, thread_id)
+    #define SINGLE_DEQUEUE(val) queue.single_dequeue(val, thread_id)
     #define QUEUE(type) DCBOQueue<FAAArrayQueue<type>, type, N_SAMPLES, N_SUBQUEUES> queue
     #define QUEUE_TYPE "d-CBO FAA"
 #endif
@@ -123,6 +124,7 @@
     #include <boost/lockfree/queue.hpp>
     #define ENQUEUE(val) queue.push(val)
     #define DEQUEUE(val) queue.pop(val)
+    #define SINGLE_DEQUEUE(val) queue.pop(val)
     #define QUEUE(type) boost::lockfree::queue<type> queue(false)
     #define QUEUE_TYPE "Unspecified. Defaulting to: Boost Lockfree Queue"
 #endif

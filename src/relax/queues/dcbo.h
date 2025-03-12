@@ -179,6 +179,11 @@ public:
         return this->double_collect(item, thread_id);
     }
 
+    bool single_dequeue(ElementType& item, int thread_id) {
+        auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
+        return this->faaaq_dequeue(min_index, item, thread_id);
+    }
+
     bool double_collect(ElementType& item, int thread_id) {
         auto versions = array<int, SubQueueCount>();
         while (true) {
