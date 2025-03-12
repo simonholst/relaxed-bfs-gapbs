@@ -27,52 +27,8 @@ using json = nlohmann::json;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
-typedef std::array<NodeID, BATCH_SIZE> NodeIdArray;
-
-template <typename Q>
-void SequentialStart(const Graph &g, pvector<Node> &parent_array, Q &queue, NodeID source_id, int thread_id, int nr_iterations) {
-    std::queue<NodeID> seq_queue;
-    seq_queue.push(source_id);
-    int counter = 0;
-    NodeID node_id;
-    while (!seq_queue.empty() && counter < nr_iterations) {
-        node_id = seq_queue.front();
-        seq_queue.pop();
-        g.out_neigh(node_id);
-        for (NodeID neighbor_id : g.out_neigh(node_id)) {
-            NodeID curr_parent = parent_array[neighbor_id].parent;
-            if (curr_parent < 0) {
-                uint32_t curr_depth = parent_array[node_id].depth;
-                uint32_t new_depth = curr_depth + 1;
-                Node updated_node = {node_id, new_depth};
-                parent_array[neighbor_id] = updated_node;
-                seq_queue.push(neighbor_id);
-            }
-        }
-        counter++;
-    }
-
-    uint8_t enqueue_counter = 0;
-    NodeIdArray enqueue_array;
-    // transfer to concurrent queue
-    while (!seq_queue.empty()) {
-        node_id = seq_queue.front();
-        seq_queue.pop();
-        enqueue_array[enqueue_counter] = node_id;
-        if (enqueue_counter >= BATCH_SIZE - 1) {
-            ENQUEUE(enqueue_array);
-            enqueue_array = NodeIdArray();
-            enqueue_counter = 0;
-        } else {
-            enqueue_counter++;
-        }
-    }
-
-    if (enqueue_counter > 0) {
-        enqueue_array[enqueue_counter] = -1;
-        ENQUEUE(enqueue_array);
-    }
-}
+// typedef NodeID NodeIdArray[BATCH_SIZE];
+using NodeIdArray = NodeID[BATCH_SIZE];
 
 pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_enabled = false, bool structured_output = false)
 {
@@ -90,19 +46,13 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     int thread_id = omp_get_thread_num();
 
     pvector<Node> parent_array = pvector<Node>(g.num_nodes());
-    QUEUE(NodeIdArray);
+    QUEUE(NodeID);
     parent_array[source_id] = {source_id, 0};
 
-    #ifdef SEQ_START
-        SequentialStart(g, parent_array, queue, source_id, thread_id, SEQ_START);
-    #endif
-    #ifndef SEQ_START
-    #define SEQ_START 0
-    NodeIdArray* source = new NodeIdArray();
-    (*source)[0] = source_id;
-    (*source)[1] = -1;
+    NodeID* source = new NodeIdArray;
+    source[0] = source_id;
+    source[1] = -1;
     ENQUEUE(source);
-    #endif
     
     termination_detection::TerminationDetection termination_detection(omp_get_max_threads());
 
@@ -113,8 +63,8 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     #pragma omp parallel private(thread_id)
     #endif
     {
-        NodeIdArray* dequeue_array;
-        NodeIdArray* enqueue_array;
+        NodeID* dequeue_array;
+        NodeID* enqueue_array;
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
@@ -125,11 +75,11 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         while (termination_detection.repeat([&]() {
             return DEQUEUE(dequeue_array);
         })) {
-            enqueue_array = new NodeIdArray();
+            enqueue_array = new NodeIdArray;
             uint8_t enqueue_counter = 0;
 
-            for (NodeID node_id : *dequeue_array) {
-
+            for (int i = 0; i < BATCH_SIZE; i++) {
+                NodeID node_id = dequeue_array[i];
                 if (node_id == -1) {
                     break;
                 }
@@ -154,10 +104,10 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                         #endif
                         Node updated_node = {node_id, new_depth};
                         if (compare_and_swap(parent_array[neighbor_id], neighbor, updated_node)) {
-                            (*enqueue_array)[enqueue_counter] = neighbor_id;
+                            enqueue_array[enqueue_counter] = neighbor_id;
                             if (enqueue_counter >= BATCH_SIZE - 1) {
                                 ENQUEUE(enqueue_array);
-                                enqueue_array = new NodeIdArray();
+                                enqueue_array = new NodeIdArray;
                                 enqueue_counter = 0;
                             } else {
                                 enqueue_counter++;
@@ -171,7 +121,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             }
 
             if (enqueue_counter > 0) {
-                (*enqueue_array)[enqueue_counter] = -1;
+                enqueue_array[enqueue_counter] = -1;
                 ENQUEUE(enqueue_array);
             }
 
@@ -235,7 +185,6 @@ int main(int argc, char *argv[]) {
     if (cli.structured_output()) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
-        structured_output["seq_start"] = SEQ_START;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];
