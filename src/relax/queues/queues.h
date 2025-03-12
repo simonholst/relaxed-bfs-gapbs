@@ -101,6 +101,24 @@
     #define QUEUE_TYPE "d-CBO FAA"
 #endif
 
+#ifdef DCBO_FAA_PTR
+    #include "dcbo.h"
+
+    #define DCBO
+
+    #ifndef N_SAMPLES
+        #define N_SAMPLES 2
+    #endif
+    #ifndef N_SUBQUEUES
+        #define N_SUBQUEUES 64
+    #endif
+
+    #define ENQUEUE(val) queue.enqueue_ptr(val, thread_id)
+    #define DEQUEUE(val) queue.dequeue_ptr(val, thread_id)
+    #define QUEUE(type) DCBOQueue<FAAArrayQueue<type>, type, N_SAMPLES, N_SUBQUEUES> queue
+    #define QUEUE_TYPE "d-CBO FAA"
+#endif
+
 #ifdef DCBO_FAA_INT
     #include "dcbo.h"
 

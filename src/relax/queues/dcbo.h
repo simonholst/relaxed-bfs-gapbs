@@ -171,6 +171,11 @@ public:
         _sub_queues[min_index]->enqueue(new ElementType(value), thread_id);
     }
 
+    void enqueue_ptr(ElementType* value, int thread_id) {
+        auto min_index = this->faaaq_optimal_enqueue_index(_sub_queues, thread_id);
+        _sub_queues[min_index]->enqueue(value, thread_id);
+    }
+
     bool dequeue(ElementType& item, int thread_id) {
         auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
         if (this->faaaq_dequeue(min_index, item, thread_id)) {
@@ -179,12 +184,44 @@ public:
         return this->double_collect(item, thread_id);
     }
 
+    bool dequeue_ptr(ElementType*& item, int thread_id) {
+        auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
+        item = _sub_queues[min_index]->dequeue(thread_id);
+        if (item != nullptr) {
+            return true;
+        }
+        return this->double_collect_ptr(item, thread_id);
+    }
+
     bool double_collect(ElementType& item, int thread_id) {
         auto versions = array<int, SubQueueCount>();
         while (true) {
             for (int i = 0; i < SubQueueCount; ++i) {
                 versions[i] = _sub_queues[i]->enqueue_version(thread_id);
                 if (this->faaaq_dequeue(i, item, thread_id)) {
+                    return true;
+                }
+            }
+            bool all_equal = true;
+            for (int i = 0; i < SubQueueCount; ++i) {
+                if (_sub_queues[i]->enqueue_version(thread_id) != versions[i]) {
+                    all_equal = false;
+                    break;
+                }
+            }
+            if (all_equal) {
+                return false;
+            }
+        }
+    }
+
+    bool double_collect_ptr(ElementType*& item, int thread_id) {
+        auto versions = array<int, SubQueueCount>();
+        while (true) {
+            for (int i = 0; i < SubQueueCount; ++i) {
+                versions[i] = _sub_queues[i]->enqueue_version(thread_id);
+                item = _sub_queues[i]->dequeue(thread_id);
+                if (item != nullptr) {
                     return true;
                 }
             }
