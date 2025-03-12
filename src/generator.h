@@ -9,6 +9,8 @@
 #include <cinttypes>
 #include <limits>
 #include <random>
+#include <math.h>
+#include <queue>
 
 #include "graph.h"
 #include "pvector.h"
@@ -162,6 +164,44 @@ class Generator {
     return el;
   }
 
+  EdgeList MakeBinaryTreeEL() {
+    EdgeList el(num_nodes_-1);
+    uint64_t edge_index = 0;
+    uint64_t offset = 0;
+    std::queue<uint64_t> leaf_nodes;
+    leaf_nodes.push(0);
+
+    int64_t i = 1;
+    while (i < num_nodes_)
+    {
+      int64_t parent = leaf_nodes.front();
+      leaf_nodes.pop();
+
+      int64_t child_1 = parent + offset + 1;
+      int64_t child_2 = parent + offset + 2;
+
+      if (child_1 >= num_nodes_) {
+        break;
+      }
+
+      el[edge_index++] = Edge(parent, child_1);
+
+      if (child_2 >= num_nodes_) {
+        break;
+      }
+
+      el[edge_index++] = Edge(parent, child_2);
+
+      leaf_nodes.push(child_1);
+      leaf_nodes.push(child_2);
+
+      offset++;
+      i += 2;
+    }
+
+    return el;
+  }
+
   EdgeList MakeRMatEL() {
     const uint32_t max = std::numeric_limits<uint32_t>::max();
     const uint32_t A = 0.57*max, B = 0.19*max, C = 0.19*max;
@@ -214,6 +254,9 @@ class Generator {
         break;
       case GraphType::SQUARE:
         el = MakeSquareEL();
+        break;
+      case GraphType::BINARY_TREE:
+        el = MakeBinaryTreeEL();
         break;
       default:
         std::cerr << "Unknown graph type" << std::endl;
