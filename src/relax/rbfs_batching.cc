@@ -123,6 +123,8 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         nodes_visited_local = 0;
         #endif
 
+        bool do_backup = false;
+
         while (termination_detection.repeat([&]() {
             return DEQUEUE(dequeue_array);
         })) {
@@ -172,6 +174,12 @@ search_neighbors:
                 }
             }
 
+            if (do_backup) {
+                dequeue_array = backup_dequeue_array;
+                do_backup = false;
+                goto search_neighbors;
+            }
+
             if (enqueue_counter > 0) {
                 if (SINGLE_DEQUEUE(backup_dequeue_array)) {
                     auto deq_depth = parent_array[backup_dequeue_array[0]].depth;
@@ -179,30 +187,17 @@ search_neighbors:
 
                     // If the dequeued array has lesser depth we search that one before the enqueued array
                     if (deq_depth >= enq_depth) {
-                        printf("Dequeue depth h: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
+                        // printf("Dequeue depth h: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
                         enqueue_array[enqueue_counter] = -1;
                         dequeue_array = enqueue_array;
-                        for (NodeID node_id : dequeue_array) {
-                            if (node_id == -1) {
-                                break;
-                            }
-                            std::cout << "Dequeued Node ID: " << node_id << std::endl;
-                        }
-                        enqueue_array[0] = -1;
-                        printf("---\n");
-                        for (NodeID node_id : dequeue_array) {
-                            if (node_id == -1) {
-                                break;
-                            }
-                            std::cout << "Dequeued Node ID: " << node_id << std::endl;
-                        }
                         enqueue_counter = 0;
+                        do_backup = true;
                         goto search_neighbors;
                     }
 
                     // If the enqueued array has lesser depth we search that one before the dequeued array
                     else {
-                        printf("Dequeue depth l: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
+                        // printf("Dequeue depth l: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
                         dequeue_array = backup_dequeue_array;
                         goto search_neighbors;
                     }
