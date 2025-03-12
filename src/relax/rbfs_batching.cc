@@ -115,6 +115,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     {
         NodeIdArray dequeue_array;
         NodeIdArray enqueue_array;
+        NodeIdArray backup_dequeue_array;
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
@@ -128,6 +129,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 
             uint8_t enqueue_counter = 0;
 
+search_neighbors:
             for (NodeID node_id : dequeue_array) {
 
                 if (node_id == -1) {
@@ -171,8 +173,46 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             }
 
             if (enqueue_counter > 0) {
-                enqueue_array[enqueue_counter] = -1;
-                ENQUEUE(enqueue_array);
+                if (SINGLE_DEQUEUE(backup_dequeue_array)) {
+                    auto deq_depth = parent_array[backup_dequeue_array[0]].depth;
+                    auto enq_depth = parent_array[enqueue_array[0]].depth;
+
+                    // If the dequeued array has lesser depth we search that one before the enqueued array
+                    if (deq_depth >= enq_depth) {
+                        printf("Dequeue depth h: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
+                        enqueue_array[enqueue_counter] = -1;
+                        dequeue_array = enqueue_array;
+                        for (NodeID node_id : dequeue_array) {
+                            if (node_id == -1) {
+                                break;
+                            }
+                            std::cout << "Dequeued Node ID: " << node_id << std::endl;
+                        }
+                        enqueue_array[0] = -1;
+                        printf("---\n");
+                        for (NodeID node_id : dequeue_array) {
+                            if (node_id == -1) {
+                                break;
+                            }
+                            std::cout << "Dequeued Node ID: " << node_id << std::endl;
+                        }
+                        enqueue_counter = 0;
+                        goto search_neighbors;
+                    }
+
+                    // If the enqueued array has lesser depth we search that one before the dequeued array
+                    else {
+                        printf("Dequeue depth l: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
+                        dequeue_array = backup_dequeue_array;
+                        goto search_neighbors;
+                    }
+                }
+
+                // If dequeue fails, we enqueue the remaining nodes
+                else {
+                    enqueue_array[enqueue_counter] = -1;
+                    ENQUEUE(enqueue_array);
+                }
             }
         }
 
@@ -198,6 +238,9 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     nodes_visited_vec.push_back(nodes_visited_total);
     nodes_revisited_vec.push_back(nodes_revisited_total);
     #endif
+    // for (size_t i = 0; i < parent_array.size(); i++) {
+    //     std::cout << "Node " << i << ": Parent = " << parent_array[i].parent << ", Depth = " << parent_array[i].depth << std::endl;
+    // }
     return result;
 }
 
