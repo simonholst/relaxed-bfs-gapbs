@@ -206,7 +206,10 @@ search_neighbors:
                 // If dequeue fails, we enqueue the remaining nodes
                 else {
                     enqueue_array[enqueue_counter] = -1;
-                    ENQUEUE(enqueue_array);
+                    dequeue_array = enqueue_array;
+                    enqueue_counter = 0;
+                    goto search_neighbors;
+                    // ENQUEUE(enqueue_array);
                 }
             }
         }
