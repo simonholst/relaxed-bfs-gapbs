@@ -232,7 +232,7 @@ search_neighbors:
 }
 
 int main(int argc, char *argv[]) {
-    CLBFSApp cli(argc, argv, "Concurrent BFS");
+    CLBFSApp cli(argc, argv, "Concurrent BFS Batching Pre-Dequeue");
 
     if (!cli.ParseArgs()) {
         printf("Exiting");

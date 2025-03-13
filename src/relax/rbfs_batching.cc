@@ -202,7 +202,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 }
 
 int main(int argc, char *argv[]) {
-    CLBFSApp cli(argc, argv, "Concurrent BFS");
+    CLBFSApp cli(argc, argv, "Concurrent BFS Batching");
 
     if (!cli.ParseArgs()) {
         printf("Exiting");
