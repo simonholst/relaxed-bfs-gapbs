@@ -125,9 +125,8 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 
         bool do_backup = false;
 
-        while (termination_detection.repeat([&]() {
-            return DEQUEUE(dequeue_array);
-        })) {
+        while (termination_detection.repeat([&]() { return DEQUEUE(dequeue_array); })) 
+        {
 
             uint8_t enqueue_counter = 0;
 
@@ -174,45 +173,36 @@ search_neighbors:
                 }
             }
 
-            if (do_backup) {
+            if (do_backup) { // Do we have a previous backup_dequeue_array that hasn't been handled yet?
                 dequeue_array = backup_dequeue_array;
                 do_backup = false;
                 goto search_neighbors;
             }
 
-            if (enqueue_counter > 0) {
-                if (SINGLE_DEQUEUE(backup_dequeue_array)) {
-                    auto deq_depth = parent_array[backup_dequeue_array[0]].depth;
-                    auto enq_depth = parent_array[enqueue_array[0]].depth;
+            if (enqueue_counter <= 0) { continue; } // No leftover elements in enqueue_array
 
-                    // If the dequeued array has lesser depth we search that one before the enqueued array
-                    if (deq_depth >= enq_depth) {
-                        // printf("Dequeue depth h: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
-                        enqueue_array[enqueue_counter] = -1;
-                        dequeue_array = enqueue_array;
-                        enqueue_counter = 0;
-                        do_backup = true;
-                        goto search_neighbors;
-                    }
+            if (!SINGLE_DEQUEUE(backup_dequeue_array)) { // If single dequeue fails, we continue on our own enqueue_array
+                enqueue_array[enqueue_counter] = -1;
+                dequeue_array = enqueue_array;
+                enqueue_counter = 0;
+                goto search_neighbors;
+            }
 
-                    // If the enqueued array has lesser depth we search that one before the dequeued array
-                    else {
-                        // printf("Dequeue depth l: %d, Enqueue depth: %d\n", deq_depth, enq_depth);
-                        dequeue_array = backup_dequeue_array;
-                        goto search_neighbors;
-                    }
-                }
+            auto deq_depth = parent_array[backup_dequeue_array[0]].depth;
+            auto enq_depth = parent_array[enqueue_array[0]].depth;
 
-                // If dequeue fails, we enqueue the remaining nodes
-                else {
-                    enqueue_array[enqueue_counter] = -1;
-                    dequeue_array = enqueue_array;
-                    enqueue_counter = 0;
-                    goto search_neighbors;
-                    // ENQUEUE(enqueue_array);
-                }
+            if (deq_depth >= enq_depth) { // If the dequeued array has greater depth, we search our enqueue array before it
+                enqueue_array[enqueue_counter] = -1;
+                dequeue_array = enqueue_array;
+                enqueue_counter = 0;
+                do_backup = true;
+                goto search_neighbors;
+            } else { // If the enqueued array has greater depth, we search the dequeued array and append to our enqueue array
+                dequeue_array = backup_dequeue_array;
+                goto search_neighbors;
             }
         }
+        
 
         #ifdef DEBUG
         #pragma omp atomic
@@ -236,9 +226,6 @@ search_neighbors:
     nodes_visited_vec.push_back(nodes_visited_total);
     nodes_revisited_vec.push_back(nodes_revisited_total);
     #endif
-    // for (size_t i = 0; i < parent_array.size(); i++) {
-    //     std::cout << "Node " << i << ": Parent = " << parent_array[i].parent << ", Depth = " << parent_array[i].depth << std::endl;
-    // }
     return result;
 }
 
