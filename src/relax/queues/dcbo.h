@@ -120,12 +120,14 @@ private:
     typedef FAAArrayQueue<ElementType> QueueType;
     typedef array<unique_ptr<QueueType>, SubQueueCount> SubQueues;
     SubQueues _sub_queues;
+    std::atomic<uint64_t> size = 0;
 
     inline bool faaaq_dequeue(size_t min_index, ElementType& item, int thread_id) {
         ElementType* elem = _sub_queues[min_index]->dequeue(thread_id);
         if (elem == nullptr) {
             return false;
         }
+        size.fetch_sub(1);
         item = *elem;
         delete elem;
         return true;
@@ -169,6 +171,7 @@ public:
     void enqueue(const ElementType value, int thread_id) {
         auto min_index = this->faaaq_optimal_enqueue_index(_sub_queues, thread_id);
         _sub_queues[min_index]->enqueue(new ElementType(value), thread_id);
+        size.fetch_add(1);
     }
 
     bool dequeue(ElementType& item, int thread_id) {
@@ -204,6 +207,10 @@ public:
                 return false;
             }
         }
+    }
+
+    uint64_t get_size() const {
+        return size.load();
     }
 };
 
