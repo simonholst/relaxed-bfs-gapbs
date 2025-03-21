@@ -102,6 +102,25 @@
     #define QUEUE_TYPE "d-CBO FAA"
 #endif
 
+#ifdef DCBO_FAA_STICKY
+    #include "dcbo.h"
+
+    #define DCBO
+
+    #ifndef N_SAMPLES
+        #define N_SAMPLES 2
+    #endif
+    #ifndef N_SUBQUEUES
+        #define N_SUBQUEUES 64
+    #endif
+
+    #define ENQUEUE(val) queue.sticky_enqueue(val, thread_id)
+    #define DEQUEUE(val) queue.sticky_dequeue(val, thread_id)
+    #define SINGLE_DEQUEUE(val) queue.sticky_single_dequeue(val, thread_id)
+    #define QUEUE(type) DCBOQueue<FAAArrayQueue<type>, type, N_SAMPLES, N_SUBQUEUES> queue
+    #define QUEUE_TYPE "d-CBO FAA"
+#endif
+
 #ifdef DCBO_FAA_INT
     #include "dcbo.h"
 

@@ -18,11 +18,18 @@
 
 using namespace std;
 
+#define STICKINESS_ENQUEUE_THRESHOLD 2
+#define STICKINESS_DEQUEUE_THRESHOLD 2
+
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
 class DCBOQueueBase {
 protected:
     static thread_local XoshiroCpp::Xoshiro256Plus _generator;
     static thread_local uniform_int_distribution<int> _distribution;
+    static thread_local uint32_t stickiness_enqueue_counter;
+    static thread_local uint32_t stickiness_dequeue_counter;
+    static thread_local array<size_t, SampleSize> stickiness_enqueue_indices;
+    static thread_local array<size_t, SampleSize> stickiness_dequeue_indices;
 };
 
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
@@ -31,6 +38,17 @@ thread_local XoshiroCpp::Xoshiro256Plus DCBOQueueBase<QueueType, ElementType, Sa
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
 thread_local uniform_int_distribution<int> DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::_distribution{0, SubQueueCount - 1};
 
+template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
+thread_local uint32_t DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::stickiness_enqueue_counter = 0;
+
+template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
+thread_local uint32_t DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::stickiness_dequeue_counter = 0;
+
+template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
+thread_local array<size_t, SampleSize> DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::stickiness_enqueue_indices;
+
+template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
+thread_local array<size_t, SampleSize> DCBOQueueBase<QueueType, ElementType, SampleSize, SubQueueCount>::stickiness_dequeue_indices;
 
 template <typename QueueType, typename ElementType, int SampleSize, int SubQueueCount>
 class DCBOQueue;
@@ -145,6 +163,29 @@ private:
         return min_index;
     }
 
+    inline size_t faaaq_optimal_stickiness_enqueue_index(array<unique_ptr<QueueType>, SubQueueCount> &sub_queues, const int thread_id) {
+        if (this->stickiness_enqueue_counter == 0) {
+            for (size_t i = 0; i < this->stickiness_enqueue_indices.size(); i++) {
+                this->stickiness_enqueue_indices[i] = this->_distribution(this->_generator);
+            }
+        }
+        auto min_index = this->stickiness_enqueue_indices[0];
+        auto min_enqueue_count = sub_queues[min_index]->enqueue_count(thread_id);
+        for (size_t i = 1; i < this->stickiness_enqueue_indices.size(); i++) {
+            auto index = this->stickiness_enqueue_indices[i];
+            auto enqueue_count = sub_queues[index]->enqueue_count(thread_id);
+            if (enqueue_count < min_enqueue_count) {
+                min_enqueue_count = enqueue_count;
+                min_index = index;
+            }
+        }
+        this->stickiness_enqueue_counter++;
+        if (this->stickiness_enqueue_counter >= STICKINESS_ENQUEUE_THRESHOLD) {
+            this->stickiness_enqueue_counter = 0;
+        }
+        return min_index;
+    }
+
     inline size_t faaaq_optimal_dequeue_index(array<unique_ptr<QueueType>, SubQueueCount>& sub_queues, const int thread_id) {
         auto min_index = this->_distribution(this->_generator);
         auto min_dequeue_count = sub_queues[min_index]->dequeue_count(thread_id);
@@ -155,6 +196,29 @@ private:
                 min_dequeue_count = dequeue_count;
                 min_index = random_index;
             }
+        }
+        return min_index;
+    }
+
+    inline size_t faaaq_optimal_stickiness_dequeue_index(array<unique_ptr<QueueType>, SubQueueCount> &sub_queues, const int thread_id) {
+        if (this->stickiness_dequeue_counter == 0) {
+            for (size_t i = 0; i < this->stickiness_dequeue_indices.size(); i++) {
+                this->stickiness_dequeue_indices[i] = this->_distribution(this->_generator);
+            }
+        }
+        auto min_index = this->stickiness_dequeue_indices[0];
+        auto min_dequeue_count = sub_queues[min_index]->dequeue_count(thread_id);
+        for (size_t i = 1; i < this->stickiness_dequeue_indices.size(); i++) {
+            auto index = this->stickiness_dequeue_indices[i];
+            auto dequeue_count = sub_queues[index]->dequeue_count(thread_id);
+            if (dequeue_count < min_dequeue_count) {
+                min_dequeue_count = dequeue_count;
+                min_index = index;
+            }
+        }
+        this->stickiness_dequeue_counter++;
+        if (this->stickiness_dequeue_counter >= STICKINESS_DEQUEUE_THRESHOLD) {
+            this->stickiness_dequeue_counter = 0;
         }
         return min_index;
     }
@@ -179,8 +243,26 @@ public:
         return this->double_collect(item, thread_id);
     }
 
+    void sticky_enqueue(const ElementType value, int thread_id) {
+        auto min_index = this->faaaq_optimal_stickiness_enqueue_index(_sub_queues, thread_id);
+        _sub_queues[min_index]->enqueue(new ElementType(value), thread_id);
+    }
+
+    bool sticky_dequeue(ElementType &item, int thread_id) {
+        auto min_index = this->faaaq_optimal_stickiness_dequeue_index(_sub_queues, thread_id);
+        if (this->faaaq_dequeue(min_index, item, thread_id)) {
+            return true;
+        }
+        return this->double_collect(item, thread_id);
+    }
+
     bool single_dequeue(ElementType& item, int thread_id) {
         auto min_index = this->faaaq_optimal_dequeue_index(_sub_queues, thread_id);
+        return this->faaaq_dequeue(min_index, item, thread_id);
+    }
+
+    bool sticky_single_dequeue(ElementType& item, int thread_id) {
+        auto min_index = this->faaaq_optimal_stickiness_dequeue_index(_sub_queues, thread_id);
         return this->faaaq_dequeue(min_index, item, thread_id);
     }
 
@@ -397,30 +479,5 @@ public:
         }
     }
 };
-
-// int main() {
-
-
-//     DCBOQueue<FAAArrayQueue<int>, int, 2, 8> q1;
-
-//     // #pragma omp parallel
-//     // {
-//         for (int i = 0; i < 100; i++) {
-//             q1.enqueue(i, omp_get_thread_num());
-//         }
-//     // }
-
-//     // #pragma omp parallel
-//     // {
-//         int item;
-//         for (int i = 0; i < 100; i++) {
-//             q1.dequeue(item, omp_get_thread_num());
-//             #pragma omp critical
-//             cout << "Dequeued: " << item << endl;
-//         }
-//     // }
-
-//     return 0;
-// }
 
 #endif // SUBQUEUES_H
