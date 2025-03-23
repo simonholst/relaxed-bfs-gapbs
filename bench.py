@@ -30,7 +30,7 @@ class Args:
     n_subqueues: list[int]
     batch_sizes: list[int]
     debug: list[str]
-    queues: list[str]
+    algorithms: list[str]
 
 
 def parse_compilation_flags(kwards):
@@ -38,6 +38,10 @@ def parse_compilation_flags(kwards):
     for key, value in kwards.items():
         flags += f"{key}={value} "
     return flags
+
+
+def make_sequential_bfs(queue, **kwargs):
+    return f"make relax_sequential_bfs " + parse_compilation_flags(kwargs)
 
 
 def make_bfs(queue, **kwargs):
@@ -66,6 +70,13 @@ def make_rbfs_batching_predeq_depth_thresh(queue, **kwargs):
 
 
 ALGORITHMS = [
+    Algorithm(
+        "Sequential",
+        "Sequential",
+        make_sequential_bfs,
+        "relax_sequential_bfs",
+        ["DEBUG"],
+    ),
     Algorithm("DO", "DO", make_bfs, "bfs", []),
     Algorithm("MS", "MS", make_rbfs, "relax_rbfs", ["DEBUG"]),
     Algorithm("FAA", "FAA", make_rbfs, "relax_rbfs", ["DEBUG"]),
@@ -132,12 +143,12 @@ ALGORITHMS = [
 def parse_args():
     parser = argparse.ArgumentParser(description="Benchmarking utility for BFS")
     parser.add_argument(
-        "-q",
-        "--queues",
+        "-a",
+        "--algorithms",
         nargs="+",
         required=True,
         type=str,
-        help="List of queues to run algorithms with",
+        help="List of algorithms to run",
         choices=[alg.display_name for alg in ALGORITHMS],
     )
     parser.add_argument(
@@ -205,7 +216,7 @@ def parse_args():
         n_subqueues=parsed_args.n_subqueues,
         batch_sizes=parsed_args.batch_sizes,
         debug=parsed_args.debug,
-        queues=parsed_args.queues,
+        algorithms=parsed_args.algorithms,
     )
 
 
@@ -276,7 +287,9 @@ def run_algorithms(algorithms: list[Algorithm], args: Args):
 def main():
     args = parse_args()
     start = time.time()
-    selected_algorithms = [alg for alg in ALGORITHMS if alg.display_name in args.queues]
+    selected_algorithms = [
+        alg for alg in ALGORITHMS if alg.display_name in args.algorithms
+    ]
 
     try:
         run_algorithms(selected_algorithms, args)
