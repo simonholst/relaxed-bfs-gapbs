@@ -21,6 +21,10 @@ pvector<NodeID> InitParent(const Graph &g) {
   return parent;
 }
 
+#ifdef DEBUG    
+uint64_t max_degree_node = 0;
+#endif
+
 pvector<NodeID> SequentialBFS(const Graph &g, NodeID source, bool logging_enabled = false) {
     #ifdef DEBUG
     uint64_t nodes_visited = 0;
@@ -35,12 +39,15 @@ pvector<NodeID> SequentialBFS(const Graph &g, NodeID source, bool logging_enable
     {
         #ifdef DEBUG
         nodes_visited++;
+        uint64_t degree = 0;
         #endif
         NodeID node = queue.front();
         queue.pop();
-        g.out_neigh(node);
         for (NodeID v : g.out_neigh(node))
         {
+            #ifdef DEBUG
+            degree++;
+            #endif
             NodeID curr_val = parent[v];
             if (curr_val < 0)
             {
@@ -48,6 +55,12 @@ pvector<NodeID> SequentialBFS(const Graph &g, NodeID source, bool logging_enable
                 queue.push(v);
             }
         }
+        #ifdef DEBUG
+        if (degree > max_degree_node)
+        {
+            max_degree_node = degree;
+        }
+        #endif
 
     }
     #ifdef DEBUG
@@ -84,6 +97,9 @@ int main(int argc, char* argv[])
 
     if (cli.structured_output()) {
         auto runs = structured_output["run_details"];
+        #ifdef DEBUG
+        structured_output["max_degree"] = max_degree_node;
+        #endif
         structured_output["queue"] = "std::queue";
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
