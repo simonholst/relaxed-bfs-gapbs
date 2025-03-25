@@ -31,9 +31,7 @@ class Args:
     batch_sizes: list[int]
     debug: list[str]
     algorithms: list[str]
-    pin_threads: bool
-    max_thread_count: int
-    sockets: int
+    pin_threads: str
 
 
 def parse_compilation_flags(kwards):
@@ -204,20 +202,9 @@ def parse_args():
     parser.add_argument(
         "-p",
         "--pin_threads",
-        action="store_true",
-        help="Pin threads to cores, must be set together with -s and -m",
-    )
-    parser.add_argument(
-        "-s",
-        "--sockets",
-        type=int,
-        help="Number of sockets",
-    )
-    parser.add_argument(
-        "-m",
-        "--max_thread_count",
-        type=int,
-        help="Max thread count",
+        choices=["ithaca", "ithaca_ht", "athena", "athena_ht"],
+        type=str,
+        help="Pin threads to cores / sockets according to machine. ht for hyperthreading",
     )
     parser.add_argument("-o", "--output", type=str, help="Output dir", required=True)
     parsed_args = parser.parse_args()
@@ -229,12 +216,6 @@ def parse_args():
     else:
         parsed_args.debug = ["FALSE"]
 
-    if parsed_args.pin_threads:
-        if not parsed_args.sockets:
-            parser.error("Pin threads requires -s")
-        if not parsed_args.max_thread_count:
-            parser.error("Pin threads requires -m")
-
     return Args(
         bfsargs=parsed_args.bfsargs,
         threads=parsed_args.threads,
@@ -245,8 +226,6 @@ def parse_args():
         debug=parsed_args.debug,
         algorithms=parsed_args.algorithms,
         pin_threads=parsed_args.pin_threads,
-        max_thread_count=parsed_args.max_thread_count,
-        sockets=parsed_args.sockets,
     )
 
 
@@ -264,24 +243,55 @@ def print_aligned(left, rest):
     print(f"{left:<20} {rest}")
 
 
-def pin_threads(thread_count: int, max_thread_count: int, sockets) -> list[str]:
-    cpus_per_socket = max_thread_count // sockets
+def pin_threads_ithaca(thread_count: int, with_hyperthreading: bool) -> list[str]:
+    cpus_per_socket = 18
     cpu_list = []
+    max_size = 2 * thread_count if with_hyperthreading else thread_count
+
     for i in range(cpus_per_socket):
-        cpu_list.append(str(i * 2))
-        if len(cpu_list) >= thread_count:
+        cpu_num = i * 2
+        cpu_list.append(cpu_num)
+        if with_hyperthreading:
+            cpu_list.append(cpu_num + 36)
+        if len(cpu_list) >= max_size:
             return cpu_list
+
     for i in range(cpus_per_socket):
-        cpu_list.append(str(i * 2 + 1))
-        if len(cpu_list) >= thread_count:
+        cpu_num = i * 2 + 1
+        cpu_list.append(cpu_num)
+        if with_hyperthreading:
+            cpu_list.append(cpu_num + 36)
+        if len(cpu_list) >= max_size:
             return cpu_list
+    return cpu_list
+
+
+def pin_threads_athena(thread_count: int, with_hyperthreading: bool) -> list[str]:
+    if thread_count == 1:
+        return ["0"]
+    cpu_list = []
+    for i in range(thread_count):
+        cpu_list.append(str(i))
+        if with_hyperthreading:
+            cpu_list.append(str(i + 256))
     return cpu_list
 
 
 def get_thread_command(args: Args, thread_count: int):
     if not args.pin_threads:
         return f"OMP_NUM_THREADS={thread_count}"
-    cpu_list = pin_threads(thread_count, args.max_thread_count, args.sockets)
+    if args.pin_threads == "athena":
+        cpu_list = pin_threads_athena(thread_count, with_hyperthreading=False)
+    elif args.pin_threads == "athena_ht":
+        cpu_list = pin_threads_athena(thread_count, with_hyperthreading=True)
+    elif args.pin_threads == "ithaca":
+        cpu_list = pin_threads_ithaca(thread_count, with_hyperthreading=False)
+    elif args.pin_threads == "ithaca_ht":
+        cpu_list = pin_threads_ithaca(thread_count, with_hyperthreading=True)
+    else:
+        print("Unknown pinning method:", args.pin_threads)
+        exit(1)
+    cpu_list = [str(cpu) for cpu in cpu_list]
     return f"numactl --physcpubind={','.join(cpu_list)} --localalloc"
 
 
