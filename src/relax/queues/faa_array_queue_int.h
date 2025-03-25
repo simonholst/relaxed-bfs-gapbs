@@ -236,7 +236,7 @@ private:
     alignas(128) std::atomic<Node*> head;
     alignas(128) std::atomic<Node*> tail;
 
-    static const int MAX_THREADS = 128;
+    static const int MAX_THREADS = 256;
     const int maxThreads;
 
     int32_t taken = -2;  // Muuuahahah !
