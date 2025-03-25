@@ -237,7 +237,7 @@ def print_aligned(left, rest):
 def run_algorithms(algorithms: list[Algorithm], args: Args):
     already_run = set()
 
-    os.mkdir(args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
     for algorithm, n_samples, n_subqueue, batch_size, debug in product(
         algorithms,
         args.n_samples,
