@@ -232,10 +232,8 @@ def parse_args():
 def check_return_code(process: subprocess.CompletedProcess, command: str):
     if process.returncode != 0:
         print(
-            f"Command failed with return code {process.returncode}:\n{command}",
+            f"ERROR: Command failed with return code {process.returncode}: {command}",
         )
-        print("Exiting...")
-        exit(1)
 
 
 def print_aligned(left, rest):
