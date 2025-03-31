@@ -115,7 +115,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     {
         NodeIdArray dequeue_array;
         NodeIdArray enqueue_array;
-        NodeIdArray backup_dequeue_array;
+        NodeIdArray backup_array;
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
@@ -173,16 +173,16 @@ search_neighbors:
                 }
             }
 
-            if (do_backup) { // Do we have a previous backup_dequeue_array that hasn't been handled yet?
-                dequeue_array = backup_dequeue_array;
+            if (do_backup) { // Do we have a previous backup_array that hasn't been handled yet?
+                dequeue_array = backup_array;
                 do_backup = false;
                 goto search_neighbors;
             }
 
             if (enqueue_counter <= 0) { continue; } // No leftover elements in enqueue_array
 
-            if (SINGLE_DEQUEUE(backup_dequeue_array)) {
-                auto deq_depth = parent_array[backup_dequeue_array[0]].depth;
+            if (SINGLE_DEQUEUE(backup_array)) {
+                auto deq_depth = parent_array[backup_array[0]].depth;
                 auto enq_depth = parent_array[enqueue_array[0]].depth;
                 // If the dequeued array has greater depth, we search our enqueue array before it
                 if (deq_depth >= enq_depth) { 
@@ -194,7 +194,7 @@ search_neighbors:
                 } 
                 // If the enqueued array has greater depth, we search the dequeued array and continue appending to our enqueue array
                 else {
-                    dequeue_array = backup_dequeue_array;
+                    dequeue_array = backup_array;
                     goto search_neighbors;
                 }
             } else {
