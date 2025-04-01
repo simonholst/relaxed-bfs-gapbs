@@ -142,8 +142,7 @@ search_neighbors:
                 #endif
 
                 Node node = parent_array[node_id];
-                uint32_t depth = node.depth;
-                uint32_t new_depth = depth + 1;
+                uint32_t new_depth = node.depth + 1;
 
                 for (NodeID neighbor_id : g.out_neigh(node_id)) {
                     Node neighbor = parent_array[neighbor_id];
