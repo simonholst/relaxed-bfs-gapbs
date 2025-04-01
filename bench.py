@@ -268,10 +268,14 @@ def pin_threads_athena(thread_count: int, with_hyperthreading: bool) -> list[str
     if thread_count == 1:
         return ["0"]
     cpu_list = []
-    for i in range(thread_count):
-        cpu_list.append(str(i))
-        if with_hyperthreading:
-            cpu_list.append(str(i + 256))
+    if not with_hyperthreading:
+        return [str(i) for i in range(thread_count)]
+    if with_hyperthreading:
+        t = thread_count // 2
+        cpu_list_no_ht = [str(i) for i in range(t)]
+        cpu_list_ht = [str(i + 256) for i in range(t)]
+        for ts in zip(cpu_list_no_ht, cpu_list_ht):
+            cpu_list.extend(ts)
     return cpu_list
 
 
@@ -333,7 +337,8 @@ def run_algorithms(algorithms: list[Algorithm], args: Args):
         check_return_code(proc, make_command)
 
         for threads in args.threads:
-            run_command = f"{get_thread_command(args, threads)} ./bin/{algorithm.executable} {args.bfsargs} -o {output_name}_{threads}"
+            thread_name = threads // 2 if "ht" in args.pin_threads else threads
+            run_command = f"{get_thread_command(args, threads)} ./bin/{algorithm.executable} {args.bfsargs} -o {output_name}_{thread_name}"
             print_aligned("Running", run_command)
             proc = subprocess.run(run_command, shell=True, capture_output=True)
             check_return_code(proc, run_command)
