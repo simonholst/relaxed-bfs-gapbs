@@ -147,8 +147,7 @@ search_neighbors:
 
                 for (NodeID neighbor_id : g.out_neigh(node_id)) {
                     Node neighbor = parent_array[neighbor_id];
-                    uint32_t neighbor_depth = neighbor.depth;
-                    while (new_depth < neighbor_depth) {
+                    while (new_depth < neighbor.depth) {
                         #ifdef DEBUG
                         if (neighbor_depth != MAX_DEPTH)
                         {
@@ -168,7 +167,6 @@ search_neighbors:
                             break;
                         }
                         neighbor = parent_array[neighbor_id];
-                        neighbor_depth = neighbor.depth;
                     }
                 }
             }
