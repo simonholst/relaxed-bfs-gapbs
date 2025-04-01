@@ -166,7 +166,7 @@ public:
         }
     }
 
-    void enqueue(const ElementType value, int thread_id) {
+    void enqueue(const ElementType& value, int thread_id) {
         auto min_index = this->faaaq_optimal_enqueue_index(_sub_queues, thread_id);
         _sub_queues[min_index]->enqueue(new ElementType(value), thread_id);
     }
