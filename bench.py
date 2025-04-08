@@ -57,17 +57,12 @@ def make_rbfs_batching(queue, **kwargs):
     return f"make relax_rbfs_batching QUEUE={queue} " + parse_compilation_flags(kwargs)
 
 
-def make_rbfs_batching_predeq(queue, **kwargs):
-    return f"make relax_rbfs_batching_predeq QUEUE={queue} " + parse_compilation_flags(
-        kwargs
-    )
+def make_rbfs_dad(queue, **kwargs):
+    return f"make relax_rbfs_dad QUEUE={queue} " + parse_compilation_flags(kwargs)
 
 
-def make_rbfs_batching_predeq_depth_thresh(queue, **kwargs):
-    return (
-        f"make relax_rbfs_batching_predeq_depth_thresh QUEUE={queue} "
-        + parse_compilation_flags(kwargs)
-    )
+def make_rbfs_bod(queue, **kwargs):
+    return f"make relax_rbfs_bod QUEUE={queue} " + parse_compilation_flags(kwargs)
 
 
 ALGORITHMS = [
@@ -112,16 +107,16 @@ ALGORITHMS = [
     ),
     Algorithm(
         "DCBO_FAA",
-        "DCBO_FAA_PREDEQ",
-        make_rbfs_batching_predeq,
-        "relax_rbfs_batching_predeq",
+        "DCBO_FAA_DAD",
+        make_rbfs_dad,
+        "relax_rbfs_dad",
         ["DEBUG", "N_SAMPLES", "N_SUBQUEUES", "BATCH_SIZE"],
     ),
     Algorithm(
         "DCBO_FAA",
-        "DCBO_FAA_DEPTH_THRESH",
-        make_rbfs_batching_predeq_depth_thresh,
-        "relax_rbfs_batching_predeq_depth_thresh",
+        "DCBO_FAA_BOD",
+        make_rbfs_bod,
+        "relax_rbfs_bod",
         ["DEBUG", "N_SAMPLES", "N_SUBQUEUES", "BATCH_SIZE"],
     ),
     Algorithm(
