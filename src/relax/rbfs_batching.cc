@@ -27,6 +27,8 @@ using json = nlohmann::json;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
+std::vector<std::vector<uint64_t>> queue_size_vec;
+
 typedef std::array<NodeID, BATCH_SIZE> NodeIdArray;
 
 template <typename Q>
@@ -118,6 +120,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
+        std::vector<uint64_t> queue_size;
         nodes_revisited_local = 0;
         nodes_visited_local = 0;
         #endif
@@ -127,6 +130,9 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         })) {
 
             uint8_t enqueue_counter = 0;
+            #ifdef DEBUG
+            queue_size.push_back(queue.get_size());
+            #endif
 
             for (NodeID node_id : dequeue_array) {
 
@@ -175,8 +181,10 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
                 ENQUEUE(enqueue_array);
             }
         }
-
         #ifdef DEBUG
+        if (thread_id == 0) {
+            queue_size_vec.push_back(queue_size);
+        }
         #pragma omp atomic
         nodes_revisited_total += nodes_revisited_local;
         #pragma omp atomic
@@ -234,6 +242,7 @@ int main(int argc, char *argv[]) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
         structured_output["seq_start"] = SEQ_START;
+        structured_output["queue_sizes"] = queue_size_vec;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];

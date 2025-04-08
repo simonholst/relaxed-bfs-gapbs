@@ -23,6 +23,7 @@ using json = nlohmann::json;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
+std::vector<std::vector<uint64_t>> queue_size_vec;
 
 template <typename Q>
 void SequentialStart(const Graph &g, pvector<Node> &parent_array, Q &queue, NodeID source_id, int thread_id, int nr_iterations) {
@@ -92,6 +93,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         NodeID node_id;
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
+        std::vector<uint64_t> queue_size;
         nodes_revisited_local = 0;
         nodes_visited_local = 0;
         #endif
@@ -100,6 +102,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
             return DEQUEUE(node_id);
         })) {
             #ifdef DEBUG
+            queue_size.push_back(queue.get_size());
             nodes_visited_local += 1;
             #endif
             uint32_t depth = parent_array[node_id].depth;
@@ -126,6 +129,9 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         }
 
         #ifdef DEBUG
+        if (thread_id == 0) {
+            queue_size_vec.push_back(queue_size);
+        }
         #pragma omp atomic
         nodes_revisited_total += nodes_revisited_local;
         #pragma omp atomic
@@ -182,6 +188,7 @@ int main(int argc, char *argv[]) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
         structured_output["seq_start"] = SEQ_START;
+        structured_output["queue_sizes"] = queue_size_vec;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];
