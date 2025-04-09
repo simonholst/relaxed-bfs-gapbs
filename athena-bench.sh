@@ -1,4 +1,4 @@
-python3 bench.py -args "-f graphs/road_usa/road_usa.mtx -n 32"                   -t 2 4 8 16 -o do_complementary/usa         -a DO -p athena_ht
-python3 bench.py -args "-f graphs/europe_osm/europe_osm.mtx -n 32"               -t 2 4 8 16 -o do_complementary/europe      -a DO -p athena_ht
-python3 bench.py -args "-f graphs/asia_osm/asia_osm.mtx -n 32"                   -t 2 4 8 16 -o do_complementary/asia        -a DO -p athena_ht
-python3 bench.py -args "-f graphs/hugebubbles-00020/hugebubbles-00020.mtx -n 32" -t 2 4 8 16 -o do_complementary/hugebubbles -a DO -p athena_ht
+python3 bench.py -args "-f graphs/road_usa.mtx.sg -n 32"          -t 1 16 32 64 128 256 512 -sq 32 -d both -bs 16 32 64 -o unordered_complementary/usa         -a DCBO_FAA DCBO_FAA_BATCHING DCBO_FAA_PREDEQ DCBO_FAA_DEPTH_THRESH -p athena_ht
+python3 bench.py -args "-f graphs/europe_osm.mtx.sg -n 32"        -t 1 16 32 64 128 256 512 -sq 32 -d both -bs 16 32 64 -o unordered_complementary/europe      -a DCBO_FAA DCBO_FAA_BATCHING DCBO_FAA_PREDEQ DCBO_FAA_DEPTH_THRESH -p athena_ht
+python3 bench.py -args "-f graphs/asia_osm.mtx.sg -n 32"          -t 1 16 32 64 128 256 512 -sq 32 -d both -bs 16 32 64 -o unordered_complementary/asia        -a DCBO_FAA DCBO_FAA_BATCHING DCBO_FAA_PREDEQ DCBO_FAA_DEPTH_THRESH -p athena_ht
+python3 bench.py -args "-f graphs/hugebubbles-00020.mtx.sg -n 32" -t 1 16 32 64 128 256 512 -sq 32 -d both -bs 16 32 64 -o unordered_complementary/hugebubbles -a DCBO_FAA DCBO_FAA_BATCHING DCBO_FAA_PREDEQ DCBO_FAA_DEPTH_THRESH -p athena_ht
