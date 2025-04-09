@@ -27,7 +27,7 @@ using json = nlohmann::json;
 std::vector<uint64_t> source_node_vec;
 std::vector<uint64_t> nodes_visited_vec;
 std::vector<uint64_t> nodes_revisited_vec;
-std::vector<std::vector<int64_t>> total_diff_vec;
+std::vector<std::vector<uint64_t>> queue_size_vec;
 
 typedef std::array<NodeID, BATCH_SIZE> NodeIdArray;
 
@@ -121,7 +121,7 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
-        std::vector<int64_t> diff_vec;
+        std::vector<uint64_t> queue_size;
         nodes_revisited_local = 0;
         nodes_visited_local = 0;
         #endif
@@ -141,6 +141,9 @@ search_neighbors:
                 }
 
                 #ifdef DEBUG
+                if (thread_id == 0) {
+                    queue_size.push_back(queue.get_size());
+                }
                 nodes_visited_local += 1;
                 #endif
 
@@ -188,9 +191,6 @@ search_neighbors:
                 uint32_t deq_depth = parent_array[backup_dequeue_array[0]].depth;
                 uint32_t enq_depth = parent_array[enqueue_array[0]].depth;
                 int32_t diff = static_cast<int32_t>(deq_depth) - static_cast<int32_t>(enq_depth);
-                #ifdef DEBUG
-                diff_vec.push_back(diff);
-                #endif
                 auto threshold = 5;
                 bool deq_has_ge_depth = diff >= 0;
                 bool exceeds_depth_threshold = abs(diff) >= threshold;
@@ -228,9 +228,8 @@ search_neighbors:
         
 
         #ifdef DEBUG
-        #pragma omp critical
-        {
-            total_diff_vec.push_back(diff_vec);
+        if (thread_id == 0) {
+            queue_size_vec.push_back(queue_size);
         }
         #pragma omp atomic
         nodes_revisited_total += nodes_revisited_local;
@@ -289,7 +288,7 @@ int main(int argc, char *argv[]) {
         auto runs = structured_output["run_details"];
         structured_output["queue"] = QUEUE_TYPE;
         structured_output["seq_start"] = SEQ_START;
-        structured_output["diffs"] = total_diff_vec;
+        structured_output["queue_sizes"] = queue_size_vec;
         for (size_t i = 0; i < source_node_vec.size(); i++) {
             auto run = runs[i];
             run["nodes_visited"] = nodes_visited_vec[i];
