@@ -225,6 +225,7 @@ class CSRGraph {
     PrintAligned("Edges", num_edges_);
     PrintLabel("Directed", directed_ ? "Yes" : "No");
     PrintAligned("Degree", num_edges_/num_nodes_);
+    PrintMaxDegree();
   }
 
   void PrintTopology() const {
@@ -235,6 +236,14 @@ class CSRGraph {
       }
       std::cout << std::endl;
     }
+  }
+
+  void PrintMaxDegree() const {
+    int64_t max_degree = 0;
+    #pragma omp parallel for reduction(max : max_degree)
+    for (NodeID_ n=0; n < num_nodes_; n++)
+      max_degree = std::max(max_degree, out_degree(n));
+    PrintAligned("Max Degree", max_degree);
   }
 
   static DestID_** GenIndex(const pvector<SGOffset> &offsets, DestID_* neighs) {
