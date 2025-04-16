@@ -237,25 +237,33 @@ def print_aligned(left, rest):
 
 
 def pin_threads_ithaca(thread_count: int, with_hyperthreading: bool) -> list[str]:
-    cpus_per_socket = 18
+    if thread_count == 1:
+        return ["0"]
     cpu_list = []
-    max_size = 2 * thread_count if with_hyperthreading else thread_count
-
-    for i in range(cpus_per_socket):
-        cpu_num = i * 2
-        cpu_list.append(cpu_num)
-        if with_hyperthreading:
-            cpu_list.append(cpu_num + 36)
-        if len(cpu_list) >= max_size:
-            return cpu_list
-
-    for i in range(cpus_per_socket):
-        cpu_num = i * 2 + 1
-        cpu_list.append(cpu_num)
-        if with_hyperthreading:
-            cpu_list.append(cpu_num + 36)
-        if len(cpu_list) >= max_size:
-            return cpu_list
+    if not with_hyperthreading:
+        if thread_count <= 18:
+            return [str(i * 2) for i in range(thread_count)]
+        else:
+            socket1 = [str(i * 2) for i in range(18)]
+            socket2 = [str(i * 2 + 1) for i in range(thread_count - 18)]
+            return socket1 + socket2
+    if with_hyperthreading:
+        if thread_count <= 36:
+            t = thread_count // 2
+            cpu_list_no_ht = [str(i * 2) for i in range(t)]
+            cpu_list_ht = [str(i * 2 + 36) for i in range(t)]
+            for ts in zip(cpu_list_no_ht, cpu_list_ht):
+                cpu_list.extend(ts)
+        else:
+            cpu_list_no_ht = [str(i * 2) for i in range(18)]
+            cpu_list_ht = [str(i * 2 + 36) for i in range(18)]
+            for ts in zip(cpu_list_no_ht, cpu_list_ht):
+                cpu_list.extend(ts)
+            remaining_threads = thread_count - 36
+            cpu_list_no_ht = [str(i * 2 + 1) for i in range(remaining_threads // 2)]
+            cpu_list_ht = [str(i * 2 + 37) for i in range(remaining_threads // 2)]
+            for ts in zip(cpu_list_no_ht, cpu_list_ht):
+                cpu_list.extend(ts)
     return cpu_list
 
 
@@ -263,10 +271,14 @@ def pin_threads_athena(thread_count: int, with_hyperthreading: bool) -> list[str
     if thread_count == 1:
         return ["0"]
     cpu_list = []
-    for i in range(thread_count):
-        cpu_list.append(str(i))
-        if with_hyperthreading:
-            cpu_list.append(str(i + 256))
+    if not with_hyperthreading:
+        return [str(i) for i in range(thread_count)]
+    if with_hyperthreading:
+        t = thread_count // 2
+        cpu_list_no_ht = [str(i) for i in range(t)]
+        cpu_list_ht = [str(i + 256) for i in range(t)]
+        for ts in zip(cpu_list_no_ht, cpu_list_ht):
+            cpu_list.extend(ts)
     return cpu_list
 
 
@@ -328,7 +340,8 @@ def run_algorithms(algorithms: list[Algorithm], args: Args):
         check_return_code(proc, make_command)
 
         for threads in args.threads:
-            run_command = f"{get_thread_command(args, threads)} ./bin/{algorithm.executable} {args.bfsargs} -o {output_name}_{threads}"
+            thread_name = f"{threads}_ht" if "ht" in args.pin_threads else threads
+            run_command = f"{get_thread_command(args, threads)} ./bin/{algorithm.executable} {args.bfsargs} -o {output_name}_{thread_name}"
             print_aligned("Running", run_command)
             proc = subprocess.run(run_command, shell=True, capture_output=True)
             check_return_code(proc, run_command)
