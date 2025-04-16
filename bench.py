@@ -200,6 +200,7 @@ def parse_args():
         choices=["ithaca", "ithaca_ht", "athena", "athena_ht"],
         type=str,
         help="Pin threads to cores / sockets according to machine. ht for hyperthreading",
+        default="",
     )
     parser.add_argument("-o", "--output", type=str, help="Output dir", required=True)
     parsed_args = parser.parse_args()
