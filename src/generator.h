@@ -145,22 +145,40 @@ class Generator {
   }
 
   EdgeList MakeSquareEL() {
-    int64_t dimension = num_nodes_;
-    EdgeList el(2 * dimension * (dimension - 1));
-    int64_t i = 0;
-    
-    for (int64_t row = 0; row < dimension; row++) {
-      for (int64_t col = 0; col < dimension; col++) {
-        if (col + 1 < dimension) {
-          el[i] = Edge(row * dimension + col, row * dimension + col + 1);
-          i++;
-        }
-        if (row + 1 < dimension) {
-          el[i] = Edge(row * dimension + col, (row + 1) * dimension + col);
-          i++;  
+    return MakeNDGridEL(2);
+  }
+
+  EdgeList MakeNDGridEL(int n_dimensions) {
+    if (n_dimensions < 1) {
+      throw std::invalid_argument("Number of dimensions must be at least 1");
+    }
+
+    int64_t dimension_size = std::floor(std::pow(num_nodes_, 1.0 / n_dimensions));
+    int64_t total_nodes = std::pow(dimension_size, n_dimensions);
+
+    EdgeList el;
+    for (int64_t node = 0; node < total_nodes; ++node) {
+      std::vector<int64_t> coords(n_dimensions);
+      int64_t temp_node = node;
+
+      for (int d = n_dimensions - 1; d >= 0; --d) {
+        coords[d] = temp_node % dimension_size;
+        temp_node /= dimension_size;
+      }
+
+      for (int d = 0; d < n_dimensions; ++d) {
+        if (coords[d] + 1 < dimension_size) {
+          std::vector<int64_t> neighbor_coords = coords;
+          neighbor_coords[d]++;
+          int64_t neighbor = 0;
+          for (int i = 0; i < n_dimensions; ++i) {
+            neighbor = neighbor * dimension_size + neighbor_coords[i];
+          }
+          el.push_back(Edge(node, neighbor));
         }
       }
     }
+
     return el;
   }
 
@@ -252,8 +270,10 @@ class Generator {
       case GraphType::PAR_CHAINS:
         el = MakeParChainEL();
         break;
-      case GraphType::SQUARE:
-        el = MakeSquareEL();
+      case GraphType::DIMENSIONAL:
+        if (degree_ > 10)
+          std::cerr << "Warning: degree > 10 for dimensional graph, might take long, use -k to set a lower one" << std::endl;
+        el = MakeNDGridEL(degree_);
         break;
       case GraphType::BINARY_TREE:
         el = MakeBinaryTreeEL();

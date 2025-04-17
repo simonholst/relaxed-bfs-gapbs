@@ -28,7 +28,7 @@ enum class GraphType {
   KRONECKER,
   UNIFORM,
   PAR_CHAINS,
-  SQUARE,
+  DIMENSIONAL,
   BINARY_TREE
 };
 
@@ -37,7 +37,7 @@ std::string GraphTypeToString(GraphType gt) {
     case GraphType::KRONECKER:   return "kronecker";
     case GraphType::UNIFORM:     return "uniform";
     case GraphType::PAR_CHAINS:  return "par-chains";
-    case GraphType::SQUARE:      return "square";
+    case GraphType::DIMENSIONAL: return "dimensional";
     case GraphType::BINARY_TREE: return "binary-tree";
     default:                     return "unknown";
   }
@@ -173,7 +173,7 @@ class CLBFSApp : public CLApp {
   CLBFSApp(int argc, char** argv, std::string name) : CLApp(argc, argv, name) {
     get_args_ += "o:t:";
     AddHelpLine('o', "file", "enable structured output and write to given filename", "false");
-    AddHelpLine('t', "graph-type", "graph type (kronecker, uniform, par-chains, square, binary-tree). For par-chains: should be run with -r 0, -k sets number of chains, -g sets chain length", "kronecker");
+    AddHelpLine('t', "graph-type", "graph type (kronecker, uniform, par-chains, dimensional, binary-tree). For par-chains: should be run with -r 0, -k sets number of chains, -g sets chain length", "kronecker");
   }
 
   void HandleArg(signed char opt, char* opt_arg) override {
@@ -186,8 +186,8 @@ class CLBFSApp : public CLApp {
         graph_type_ = GraphType::UNIFORM;
       } else if (std::string(opt_arg) == "par-chains") {
         graph_type_ = GraphType::PAR_CHAINS;
-      } else if (std::string(opt_arg) == "square") {
-        graph_type_ = GraphType::SQUARE;
+      } else if (std::string(opt_arg) == "dimensional") {
+        graph_type_ = GraphType::DIMENSIONAL;
       } else if (std::string(opt_arg) == "binary-tree") {
         graph_type_ = GraphType::BINARY_TREE;
       } else {
