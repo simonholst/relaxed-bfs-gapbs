@@ -148,7 +148,7 @@ search_neighbors:
                     Node neighbor = parent_array[neighbor_id];
                     while (new_depth < neighbor.depth) {
                         #ifdef DEBUG
-                        if (neighbor_depth != MAX_DEPTH)
+                        if (neighbor.depth != MAX_DEPTH)
                         {
                             nodes_revisited_local += 1;
                         }
