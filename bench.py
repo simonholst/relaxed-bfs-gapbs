@@ -46,7 +46,11 @@ def make_sequential_bfs(queue, **kwargs):
 
 
 def make_bfs(queue, **kwargs):
-    return f"make bfs QUEUE={queue} " + parse_compilation_flags(kwargs)
+    return f"make bfs " + parse_compilation_flags(kwargs)
+
+
+def make_bfs_td(queue, **kwargs):
+    return f"make bfs_td " + parse_compilation_flags(kwargs)
 
 
 def make_rbfs(queue, **kwargs):
@@ -74,6 +78,7 @@ ALGORITHMS = [
         ["DEBUG"],
     ),
     Algorithm("DO", "DO", make_bfs, "bfs", []),
+    Algorithm("DO_TD", "DO_TD", make_bfs, "bfs_td", []),
     Algorithm("MS", "MS", make_rbfs, "relax_rbfs", ["DEBUG"]),
     Algorithm("FAA", "FAA", make_rbfs, "relax_rbfs", ["DEBUG"]),
     Algorithm("FAA_INT", "FAA_INT", make_rbfs, "relax_rbfs", ["DEBUG"]),
