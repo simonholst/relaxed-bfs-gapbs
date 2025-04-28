@@ -69,6 +69,8 @@ else
     echo "Skipping kronecker DO benchmarks, already completed."
 fi
 
+get_progress
+
 if [ $progress -eq 5 ]; then
     echo "Running kronecker benchmarks - DO_TD"
     python3 bench.py -args "-g 24 -n 2" -t 1 2 4 8 16 32 64 128 256 512 -d no -o athena/kronecker -a DO_TD -p ithaca_ht
