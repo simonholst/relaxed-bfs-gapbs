@@ -345,7 +345,7 @@ def run_algorithms(algorithms: list[Algorithm], args: Args):
         proc = subprocess.run(make_command, shell=True, capture_output=True)
         check_return_code(proc, make_command)
 
-        for threads in args.threads:
+        for threads in [16]:
             thread_name = f"{threads}_ht" if "ht" in args.pin_threads else threads
             run_command = f"{get_thread_command(args, threads)} ./bin/{algorithm.executable} {args.bfsargs} -o {output_name}_{thread_name}"
             print_aligned("Running", run_command)
