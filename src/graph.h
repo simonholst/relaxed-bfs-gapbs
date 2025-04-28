@@ -225,7 +225,6 @@ class CSRGraph {
     PrintAligned("Edges", num_edges_);
     PrintLabel("Directed", directed_ ? "Yes" : "No");
     PrintAligned("Degree", num_edges_/num_nodes_);
-    PrintMaxDegree();
   }
 
   void PrintTopology() const {
