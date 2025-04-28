@@ -85,8 +85,8 @@ loop_progress_count=6
 for algorithm in "DCBO_FAA_BOD" "DCBO_FAA_DAD" "DCBO_FAA_BATCHING" "DCBO_FAA"; do
     if [ $progress -eq $loop_progress_count ]; then
         echo "Running kronecker benchmarks - $algorithm"
-        echo $(($progress + 1)) > $PROGRESS_FILE
         python3 bench.py -args "-g 24 -n 2" -t 1 32 64 128 256 512 -d both -bs 16 32 64 -sq 64 128 -o athena/kronecker -a $algorithm -p ithaca_ht
+        echo $(($progress + 1)) > $PROGRESS_FILE
     else
         echo "Skipping kronecker $algorithm benchmarks, already completed."
     fi
