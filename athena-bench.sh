@@ -4,7 +4,9 @@ touch $PROGRESS_FILE
 
 get_progress() {
     progress=$(cat bench-progress.txt)
-    if ! [[ "$progress" =~ ^[0-9]+$ ]]; then
+    if [ ! -s $PROGRESS_FILE ]; then
+        progress=0
+    elif ! [[ "$progress" =~ ^[0-9]+$ ]]; then
         echo "Error: $PROGRESS_FILE does not contain a valid number."
         exit 1
     fi
