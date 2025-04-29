@@ -149,3 +149,15 @@ if [ $progress -eq 14 ]; then
 else
     echo "Skipping kronecker FAA benchmarks, already completed."
 fi
+
+if [ $progress -eq 15 ]; then
+    echo "Running kronecker benchmarks - Sequential"
+    python3 bench.py -args "-g 24 -n 32" -t 1 -d both -o athena/kronecker -a Sequential -p athena_ht
+    echo 16 > $PROGRESS_FILE
+else
+    echo "Skipping kronecker Sequential benchmarks, already completed."
+fi
+
+if [ $progress -eq 16 ]; then
+    echo "All benchmarks completed."
+fi
