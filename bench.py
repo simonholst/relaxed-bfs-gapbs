@@ -235,6 +235,8 @@ def check_return_code(process: subprocess.CompletedProcess, command: str):
         print(
             f"ERROR: Command failed with return code {process.returncode}: {command}",
         )
+        print("STDOUT:", process.stdout.decode())
+        print("STDERR:", process.stderr.decode())
 
 
 def print_aligned(left, rest):
