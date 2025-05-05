@@ -56,108 +56,10 @@ fi
 
 get_progress
 
-
-
-
-# ##### Kronecker benchmarks #####
-
 if [ $progress -eq 4 ]; then
-    echo "Running kronecker benchmarks - DO"
-    python3 bench.py -args "-g 24 -n 32" -t 1 2 4 8 16 32 64 128 256 512 -d no -o athena/kronecker -a DO -p athena_ht
-    echo 5 > $PROGRESS_FILE
-else
-    echo "Skipping kronecker DO benchmarks, already completed."
-fi
-
-get_progress
-
-if [ $progress -eq 5 ]; then
     echo "Running kronecker benchmarks - DO_TD"
     python3 bench.py -args "-g 24 -n 32" -t 1 2 4 8 16 32 64 128 256 512 -d no -o athena/kronecker -a DO_TD -p athena_ht
-    echo 6 > $PROGRESS_FILE
+    echo 5 > $PROGRESS_FILE
 else
     echo "Skipping kronecker DO_TD benchmarks, already completed."
-fi
-
-get_progress
-loop_progress_count=6
-
-for algorithm in "DCBO_FAA_BOD" "DCBO_FAA_DAD" "DCBO_FAA_BATCHING" "DCBO_FAA"; do
-    if [ $progress -eq $loop_progress_count ]; then
-        echo "Running kronecker benchmarks - $algorithm"
-        python3 bench.py -args "-g 24 -n 32" -t 1 32 64 128 256 512 -d both -bs 16 32 64 -sq 64 128 -o athena/kronecker -a $algorithm -p athena_ht
-        echo $(($progress + 1)) > $PROGRESS_FILE
-    else
-        echo "Skipping kronecker $algorithm benchmarks, already completed."
-    fi
-    loop_progress_count=$(($loop_progress_count + 1))
-    get_progress
-done
-
-
-
-
-
-##### FAA benchmarks #####
-
-get_progress
-
-if [ $progress -eq 10 ]; then
-    echo "Running FAA road_usa benchmarks..."
-    python3 bench.py -args "-f graphs/road_usa.mtx.sg -n 32"          -t 1 32 64 128 256 512 -d both -o athena/FAA/usa -a FAA -p athena_ht
-    echo 11 > $PROGRESS_FILE
-else
-    echo "Skipping FAA road_usa benchmarks, already completed."
-fi
-
-get_progress
-
-if [ $progress -eq 11 ]; then
-    echo "Running FAA road-europe benchmarks..."
-    python3 bench.py -args "-f graphs/europe_osm.mtx.sg -n 32"           -t 1 32 64 128 256 512 -d both -o athena/FAA/europe -a FAA -p athena_ht
-    echo 12 > $PROGRESS_FILE
-else
-    echo "Skipping FAA road-europe benchmarks, already completed."
-fi
-
-get_progress
-
-if [ $progress -eq 12 ]; then
-    echo "Running FAA road-asia benchmarks..."
-    python3 bench.py -args "-f graphs/asia_osm.mtx.sg -n 32"          -t 1 32 64 128 256 512 -d both -o athena/FAA/asia -a FAA -p athena_ht
-    echo 13 > $PROGRESS_FILE
-else
-    echo "Skipping FAA road-asia benchmarks, already completed."
-fi
-
-get_progress
-
-if [ $progress -eq 13 ]; then
-    echo "Running FAA hugebubbles-00020 benchmarks..."
-    python3 bench.py -args "-f graphs/hugebubbles-00020.mtx.sg -n 32" -t 1 32 64 128 256 512 -d both -o athena/FAA/hugebubbles -a FAA -p athena_ht
-    echo 14 > $PROGRESS_FILE
-else
-    echo "Skipping FAA hugebubbles-00020 benchmarks, already completed."
-fi
-
-get_progress
-
-if [ $progress -eq 14 ]; then
-    echo "Running kronecker benchmarks - FAA"
-    python3 bench.py -args "-g 24 -n 32" -t 1 32 64 128 256 512 -d both -o athena/kronecker -a FAA -p athena_ht
-    echo 15 > $PROGRESS_FILE
-else
-    echo "Skipping kronecker FAA benchmarks, already completed."
-fi
-
-if [ $progress -eq 15 ]; then
-    echo "Running kronecker benchmarks - Sequential"
-    python3 bench.py -args "-g 24 -n 32" -t 1 -d both -o athena/kronecker -a Sequential -p athena_ht
-    echo 16 > $PROGRESS_FILE
-else
-    echo "Skipping kronecker Sequential benchmarks, already completed."
-fi
-
-if [ $progress -eq 16 ]; then
-    echo "All benchmarks completed."
 fi
