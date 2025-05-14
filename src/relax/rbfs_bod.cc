@@ -52,25 +52,25 @@ void SequentialStart(const Graph &g, pvector<Node> &parent_array, Q &queue, Node
         counter++;
     }
 
-    uint8_t enqueue_counter = 0;
-    NodeIdArray enqueue_array;
+    uint8_t producer_counter = 0;
+    NodeIdArray producer_batch;
     // transfer to concurrent queue
     while (!seq_queue.empty()) {
         node_id = seq_queue.front();
         seq_queue.pop();
-        enqueue_array[enqueue_counter] = node_id;
-        if (enqueue_counter >= BATCH_SIZE - 1) {
-            ENQUEUE(enqueue_array);
-            enqueue_array = NodeIdArray();
-            enqueue_counter = 0;
+        producer_batch[producer_counter] = node_id;
+        if (producer_counter >= BATCH_SIZE - 1) {
+            ENQUEUE(producer_batch);
+            producer_batch = NodeIdArray();
+            producer_counter = 0;
         } else {
-            enqueue_counter++;
+            producer_counter++;
         }
     }
 
-    if (enqueue_counter > 0) {
-        enqueue_array[enqueue_counter] = -1;
-        ENQUEUE(enqueue_array);
+    if (producer_counter > 0) {
+        producer_batch[producer_counter] = -1;
+        ENQUEUE(producer_batch);
     }
 }
 
@@ -113,9 +113,9 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
     #pragma omp parallel private(thread_id)
     #endif
     {
-        NodeIdArray dequeue_array;
-        NodeIdArray enqueue_array;
-        NodeIdArray backup_array;
+        NodeIdArray consumer_batch;
+        NodeIdArray producer_batch;
+        NodeIdArray backup_batch;
         
         thread_id = omp_get_thread_num();
         #ifdef DEBUG
@@ -125,13 +125,13 @@ pvector<NodeID> ConcurrentBFS(const Graph &g, NodeID source_id, bool logging_ena
 
         bool do_backup = false;
 
-        while (termination_detection.repeat([&]() { return DEQUEUE(dequeue_array); })) 
+        while (termination_detection.repeat([&]() { return DEQUEUE(consumer_batch); })) 
         {
 
-            uint8_t enqueue_counter = 0;
+            uint8_t producer_counter = 0;
 
 search_neighbors:
-            for (NodeID node_id : dequeue_array) {
+            for (NodeID node_id : consumer_batch) {
 
                 if (node_id == -1) {
                     break;
@@ -155,13 +155,13 @@ search_neighbors:
                         #endif
                         Node updated_node = {node_id, new_depth};
                         if (compare_and_swap(parent_array[neighbor_id], neighbor, updated_node)) {
-                            enqueue_array[enqueue_counter] = neighbor_id;
-                            if (enqueue_counter >= BATCH_SIZE - 1) {
-                                ENQUEUE(enqueue_array);
-                                enqueue_array = NodeIdArray();
-                                enqueue_counter = 0;
+                            producer_batch[producer_counter] = neighbor_id;
+                            if (producer_counter >= BATCH_SIZE - 1) {
+                                ENQUEUE(producer_batch);
+                                producer_batch = NodeIdArray();
+                                producer_counter = 0;
                             } else {
-                                enqueue_counter++;
+                                producer_counter++;
                             }
                             break;
                         }
@@ -170,50 +170,50 @@ search_neighbors:
                 }
             }
 
-            if (do_backup) { // Do we have a previous backup_array that hasn't been handled yet?
-                dequeue_array = backup_array;
+            if (do_backup) { // Do we have a previous backup_batch that hasn't been handled yet?
+                consumer_batch = backup_batch;
                 do_backup = false;
                 goto search_neighbors;
             }
 
-            if (enqueue_counter <= 0) { continue; } // No leftover elements in enqueue_array
+            if (producer_counter <= 0) { continue; } // No leftover elements in producer_batch
 
-            if (SINGLE_DEQUEUE(backup_array)) {
-                auto deq_depth = parent_array[backup_array[0]].depth;
-                auto enq_depth = parent_array[enqueue_array[0]].depth;
+            if (SINGLE_DEQUEUE(backup_batch)) {
+                auto deq_depth = parent_array[backup_batch[0]].depth;
+                auto enq_depth = parent_array[producer_batch[0]].depth;
 
                 int32_t diff = deq_depth - enq_depth;
                 auto threshold = 5;
                 bool deq_has_ge_depth = diff >= 0;
                 bool exceeds_depth_threshold = abs(diff) >= threshold;
 
-                // If the dequeued array has greater or equal depth to enqueue array, we search our enqueue array before it
+                // If the dequeued backup_batch has greater or equal depth to producer_array, we search our producer_array before it
                 if (deq_has_ge_depth) {
-                    // If the depth difference exceeds the threshold, send the dequeued array back into the tail of the queue
+                    // If the depth difference exceeds the threshold, send the dequeued backup_batch back into the tail of the queue
                     if (exceeds_depth_threshold) {
-                        ENQUEUE(backup_array);
+                        ENQUEUE(backup_batch);
                         do_backup = false;
                     } else {
                         do_backup = true;
                     }
-                    enqueue_array[enqueue_counter] = -1;
-                    dequeue_array = enqueue_array;
-                    enqueue_counter = 0;
+                    producer_batch[producer_counter] = -1;
+                    consumer_batch = producer_batch;
+                    producer_counter = 0;
                     goto search_neighbors;
                 } else {
-                    // If the depth difference exceeds the threshold, send the enqueue array to the tail of the queue
+                    // If the depth difference exceeds the threshold, send the producer_batch to the tail of the queue
                     if (exceeds_depth_threshold) {
-                        enqueue_array[enqueue_counter] = -1;
-                        enqueue_counter = 0;
-                        ENQUEUE(enqueue_array);
+                        producer_batch[producer_counter] = -1;
+                        producer_counter = 0;
+                        ENQUEUE(producer_batch);
                     } 
-                    dequeue_array = backup_array;
+                    consumer_batch = backup_batch;
                     goto search_neighbors;
                 }
             } else {
-                enqueue_array[enqueue_counter] = -1;
-                dequeue_array = enqueue_array;
-                enqueue_counter = 0;
+                producer_batch[producer_counter] = -1;
+                consumer_batch = producer_batch;
+                producer_counter = 0;
                 goto search_neighbors;
             }
         }
