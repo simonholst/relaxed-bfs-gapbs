@@ -1,6 +1,13 @@
+#pragma once
 #include <cstdint>
 
 #define MAX_DEPTH 0xFFFFFFFF
+
+#ifndef BATCH_SIZE
+    #define BATCH_SIZE 8
+#endif
+typedef std::array<NodeID, BATCH_SIZE> NodeIdArray;
+
 struct Node
 {
     NodeID parent;

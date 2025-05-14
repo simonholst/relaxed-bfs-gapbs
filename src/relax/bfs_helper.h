@@ -4,6 +4,8 @@
 #include <iostream>
 #include <atomic>
 
+#include "queues/queues.h"
+#include "node.h"
 #include "../benchmark.h"
 #include "../graph.h"
 #include "../pvector.h"
@@ -146,5 +148,59 @@ class TerminationDetection {
 };
 
 }  // namespace termination_detection
+
+template <typename Q>
+void SequentialStart(const Graph &g, pvector<Node> &parent_array, Q &queue, NodeID source_id, int thread_id, int nr_iterations)
+{
+    std::queue<NodeID> seq_queue;
+    seq_queue.push(source_id);
+    int counter = 0;
+    NodeID node_id;
+    while (!seq_queue.empty() && counter < nr_iterations)
+    {
+        node_id = seq_queue.front();
+        seq_queue.pop();
+        g.out_neigh(node_id);
+        for (NodeID neighbor_id : g.out_neigh(node_id))
+        {
+            NodeID curr_parent = parent_array[neighbor_id].parent;
+            if (curr_parent < 0)
+            {
+                uint32_t curr_depth = parent_array[node_id].depth;
+                uint32_t new_depth = curr_depth + 1;
+                Node updated_node = {node_id, new_depth};
+                parent_array[neighbor_id] = updated_node;
+                seq_queue.push(neighbor_id);
+            }
+        }
+        counter++;
+    }
+
+    uint8_t producer_counter = 0;
+    NodeIdArray producer_batch;
+    // transfer to concurrent queue
+    while (!seq_queue.empty())
+    {
+        node_id = seq_queue.front();
+        seq_queue.pop();
+        producer_batch[producer_counter] = node_id;
+        if (producer_counter >= BATCH_SIZE - 1)
+        {
+            ENQUEUE(producer_batch);
+            producer_batch = NodeIdArray();
+            producer_counter = 0;
+        }
+        else
+        {
+            producer_counter++;
+        }
+    }
+
+    if (producer_counter > 0)
+    {
+        producer_batch[producer_counter] = -1;
+        ENQUEUE(producer_batch);
+    }
+}
 
 #endif
