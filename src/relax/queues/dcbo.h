@@ -313,7 +313,7 @@ public:
         value = _queue.front();
         _queue.pop();
         lock.unlock();
-        _enqueue_count.fetch_add(1, memory_order_relaxed);
+        _dequeue_count.fetch_add(1, memory_order_relaxed);
         return true;
     }
 
@@ -397,30 +397,5 @@ public:
         }
     }
 };
-
-// int main() {
-
-
-//     DCBOQueue<FAAArrayQueue<int>, int, 2, 8> q1;
-
-//     // #pragma omp parallel
-//     // {
-//         for (int i = 0; i < 100; i++) {
-//             q1.enqueue(i, omp_get_thread_num());
-//         }
-//     // }
-
-//     // #pragma omp parallel
-//     // {
-//         int item;
-//         for (int i = 0; i < 100; i++) {
-//             q1.dequeue(item, omp_get_thread_num());
-//             #pragma omp critical
-//             cout << "Dequeued: " << item << endl;
-//         }
-//     // }
-
-//     return 0;
-// }
 
 #endif // SUBQUEUES_H

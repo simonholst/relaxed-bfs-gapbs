@@ -120,6 +120,25 @@
     #define QUEUE_TYPE "d-CBO FAA Int"
 #endif
 
+#ifdef DCBO_LOCK
+    #include "dcbo.h"
+
+    #define DCBO
+
+    #ifndef N_SAMPLES
+        #define N_SAMPLES 2
+    #endif
+    #ifndef N_SUBQUEUES
+        #define N_SUBQUEUES 64
+    #endif
+
+    #define ENQUEUE(val) queue.enqueue(val)
+    #define DEQUEUE(val) queue.dequeue(val)
+    #define SINGLE_DEQUEUE(val) queue.dequeue(val)
+    #define QUEUE(type) DCBOQueue<SequentialQueue<type>, type, N_SAMPLES, N_SUBQUEUES> queue
+    #define QUEUE_TYPE "d-CBO Locked std::queue"
+#endif
+
 #ifndef QUEUE
     #include <boost/lockfree/queue.hpp>
     #define ENQUEUE(val) queue.push(val)
