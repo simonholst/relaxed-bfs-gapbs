@@ -299,21 +299,22 @@ private:
 
 public:
     void enqueue(const T& value) {
-        unique_lock<mutex> lock(_mutex);
+        _mutex.lock();
         _queue.push(value);
-        lock.unlock();
         _enqueue_count.fetch_add(1, memory_order_relaxed);
+        _mutex.unlock();
     }
 
     bool dequeue(T& value) {
-        unique_lock<mutex> lock(_mutex);
+        _mutex.lock();
         if (_queue.empty()) {
+            _mutex.unlock();
             return false;
         }
         value = _queue.front();
         _queue.pop();
-        lock.unlock();
         _dequeue_count.fetch_add(1, memory_order_relaxed);
+        _mutex.unlock();
         return true;
     }
 
